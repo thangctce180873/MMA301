@@ -1,0 +1,812 @@
+import React, { useState } from "react";
+
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { Ionicons } from "@expo/vector-icons";
+
+import { Picker } from "@react-native-picker/picker";
+
+import * as ImagePicker from "expo-image-picker";
+
+import { useAuth } from "../context/AuthContext";
+
+import { categories, productConditions } from "../utils/categories";
+
+import { addItem, validateItem } from "../utils/itemUtils";
+
+const createInitialFormData = (user) => ({
+  imageUri: "",
+  title: "",
+  price: "",
+  condition: "Tốt",
+  category: "books",
+  description: "",
+  location: "",
+  sellerPhone: user?.phone || "",
+});
+
+export default function AddScreen({ navigation }) {
+  const { user } = useAuth();
+
+  const [formData, setFormData] = useState(() => createInitialFormData(user));
+
+  const [errors, setErrors] = useState({});
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const updateField = (field, value) => {
+    setFormData((previousData) => ({
+      ...previousData,
+      [field]: value,
+    }));
+
+    if (errors[field]) {
+      setErrors((previousErrors) => ({
+        ...previousErrors,
+        [field]: null,
+      }));
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Không có quyền truy cập",
+          "Bạn cần cấp quyền truy cập thư viện ảnh.",
+        );
+
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        allowsMultipleSelection: false,
+      });
+
+      if (!result.canceled && result.assets?.length > 0) {
+        updateField("imageUri", result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Lỗi khi chọn ảnh sản phẩm:", error);
+
+      Alert.alert("Có lỗi xảy ra", "Không thể mở thư viện ảnh.");
+    }
+  };
+
+  const resetForm = () => {
+    setFormData(createInitialFormData(user));
+
+    setErrors({});
+  };
+
+  const handleSubmit = async () => {
+    const validation = validateItem(formData);
+
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+
+      Alert.alert(
+        "Thông tin chưa đầy đủ",
+        "Vui lòng kiểm tra lại các trường được báo lỗi.",
+      );
+
+      return;
+    }
+
+    if (!user?.id) {
+      Alert.alert(
+        "Không thể đăng tin",
+        "Không tìm thấy thông tin tài khoản đăng nhập.",
+      );
+
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const newItem = await addItem({
+        ...formData,
+
+        // Lưu thông tin định danh tài khoản đăng tin
+        sellerId: user.id,
+
+        sellerEmail: user.email,
+
+        sellerName: user.name || "Người bán",
+
+        sellerAvatar: user.avatarUri || null,
+      });
+
+      if (!newItem) {
+        Alert.alert("Đăng tin thất bại", "Không thể lưu sản phẩm.");
+
+        return;
+      }
+
+      resetForm();
+
+      Alert.alert(
+        "Đăng tin thành công",
+        "Sản phẩm đã được thêm vào danh sách.",
+        [
+          {
+            text: "Tiếp tục đăng",
+            style: "cancel",
+          },
+          {
+            text: "Xem danh sách",
+
+            onPress: () => navigation.navigate("Home"),
+          },
+        ],
+      );
+    } catch (error) {
+      console.error("Lỗi khi đăng sản phẩm:", error);
+
+      Alert.alert("Có lỗi xảy ra", "Không thể đăng sản phẩm.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.headingContainer}>
+            <View>
+              <Text style={styles.screenTitle}>Đăng tin mới</Text>
+
+              <Text style={styles.screenSubtitle}>
+                Người bán: {user?.name || "Người dùng"}
+              </Text>
+            </View>
+
+            <View style={styles.headingIcon}>
+              <Ionicons name="add-circle-outline" size={25} color="#7A8450" />
+            </View>
+          </View>
+
+          {/* Thông tin người đăng */}
+          <View style={styles.sellerPreview}>
+            <View style={styles.sellerAvatar}>
+              {user?.avatarUri ? (
+                <Image
+                  source={{
+                    uri: user.avatarUri,
+                  }}
+                  style={styles.sellerAvatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="person-outline" size={23} color="#8A8A75" />
+              )}
+            </View>
+
+            <View style={styles.sellerPreviewInfo}>
+              <Text style={styles.sellerPreviewLabel}>Tin đăng bởi</Text>
+
+              <Text style={styles.sellerPreviewName}>
+                {user?.name || "Người bán"}
+              </Text>
+
+              <Text numberOfLines={1} style={styles.sellerPreviewEmail}>
+                {user?.email || ""}
+              </Text>
+            </View>
+
+            <Ionicons name="checkmark-circle" size={22} color="#7A8450" />
+          </View>
+
+          {/* Ảnh sản phẩm */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[
+              styles.imageUpload,
+
+              errors.imageUri && styles.inputErrorBorder,
+            ]}
+            onPress={pickImage}
+          >
+            {formData.imageUri ? (
+              <>
+                <Image
+                  source={{
+                    uri: formData.imageUri,
+                  }}
+                  style={styles.selectedImage}
+                  resizeMode="cover"
+                />
+
+                <View style={styles.imageOverlay}>
+                  <View style={styles.changeImageBadge}>
+                    <Ionicons name="camera" size={18} color="#FFFFFF" />
+
+                    <Text style={styles.changeImageText}>Đổi ảnh</Text>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <View style={styles.uploadContent}>
+                <View style={styles.cameraIcon}>
+                  <Ionicons name="camera-outline" size={34} color="#7A8450" />
+                </View>
+
+                <Text style={styles.uploadTitle}>Thêm ảnh sản phẩm</Text>
+
+                <Text style={styles.uploadDescription}>
+                  Nhấn để chọn ảnh từ thư viện
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <ErrorText message={errors.imageUri} />
+
+          {/* Tiêu đề */}
+          <FormLabel title="Tiêu đề" />
+
+          <TextInput
+            value={formData.title}
+            onChangeText={(value) => updateField("title", value)}
+            placeholder="VD: Giáo trình Giải tích 1"
+            placeholderTextColor="#A1A18E"
+            maxLength={100}
+            style={[styles.input, errors.title && styles.inputErrorBorder]}
+          />
+
+          <ErrorText message={errors.title} />
+
+          {/* Giá */}
+          <FormLabel title="Giá bán (VNĐ)" />
+
+          <View
+            style={[
+              styles.inputWithIcon,
+
+              errors.price && styles.inputErrorBorder,
+            ]}
+          >
+            <Ionicons name="cash-outline" size={20} color="#A1A18E" />
+
+            <TextInput
+              value={formData.price}
+              onChangeText={(value) =>
+                updateField(
+                  "price",
+
+                  value.replace(/[^0-9]/g, ""),
+                )
+              }
+              placeholder="0"
+              placeholderTextColor="#A1A18E"
+              keyboardType="number-pad"
+              style={styles.iconInput}
+            />
+
+            <Text style={styles.currencyText}>đ</Text>
+          </View>
+
+          <ErrorText message={errors.price} />
+
+          {/* Tình trạng */}
+          <FormLabel title="Tình trạng" />
+
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={formData.condition}
+              onValueChange={(value) => updateField("condition", value)}
+              style={styles.picker}
+              dropdownIconColor="#7A8450"
+            >
+              {productConditions.map((condition) => (
+                <Picker.Item
+                  key={condition}
+                  label={condition}
+                  value={condition}
+                />
+              ))}
+            </Picker>
+          </View>
+
+          {/* Danh mục */}
+          <FormLabel title="Danh mục" />
+
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={formData.category}
+              onValueChange={(value) => updateField("category", value)}
+              style={styles.picker}
+              dropdownIconColor="#7A8450"
+            >
+              {categories
+                .filter((category) => category.id !== "all")
+                .map((category) => (
+                  <Picker.Item
+                    key={category.id}
+                    label={category.name}
+                    value={category.id}
+                  />
+                ))}
+            </Picker>
+          </View>
+
+          {/* Địa điểm */}
+          <FormLabel title="Địa điểm giao dịch" />
+
+          <View
+            style={[
+              styles.inputWithIcon,
+
+              errors.location && styles.inputErrorBorder,
+            ]}
+          >
+            <Ionicons name="location-outline" size={20} color="#A1A18E" />
+
+            <TextInput
+              value={formData.location}
+              onChangeText={(value) => updateField("location", value)}
+              placeholder="VD: Ký túc xá khu A"
+              placeholderTextColor="#A1A18E"
+              maxLength={100}
+              style={styles.iconInput}
+            />
+          </View>
+
+          <ErrorText message={errors.location} />
+
+          {/* Số điện thoại */}
+          <FormLabel title="Số điện thoại người bán" />
+
+          <View
+            style={[
+              styles.inputWithIcon,
+
+              errors.sellerPhone && styles.inputErrorBorder,
+            ]}
+          >
+            <Ionicons name="call-outline" size={20} color="#A1A18E" />
+
+            <TextInput
+              value={formData.sellerPhone}
+              onChangeText={(value) =>
+                updateField(
+                  "sellerPhone",
+
+                  value.replace(/[^0-9]/g, ""),
+                )
+              }
+              placeholder="VD: 0912345678"
+              placeholderTextColor="#A1A18E"
+              keyboardType="phone-pad"
+              maxLength={10}
+              style={styles.iconInput}
+            />
+          </View>
+
+          <ErrorText message={errors.sellerPhone} />
+
+          {/* Mô tả */}
+          <FormLabel title="Mô tả chi tiết" />
+
+          <TextInput
+            value={formData.description}
+            onChangeText={(value) => updateField("description", value)}
+            placeholder="Mô tả tình trạng sản phẩm, lý do bán..."
+            placeholderTextColor="#A1A18E"
+            multiline
+            maxLength={1000}
+            textAlignVertical="top"
+            style={[
+              styles.input,
+              styles.descriptionInput,
+
+              errors.description && styles.inputErrorBorder,
+            ]}
+          />
+
+          <View style={styles.descriptionFooter}>
+            <ErrorText message={errors.description} />
+
+            <Text style={styles.characterCount}>
+              {formData.description.length}
+              /1000
+            </Text>
+          </View>
+
+          {/* Đăng tin */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            disabled={submitting}
+            style={[styles.submitButton, submitting && styles.disabledButton]}
+            onPress={handleSubmit}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={21}
+                  color="#FFFFFF"
+                />
+
+                <Text style={styles.submitText}>ĐĂNG TIN NGAY</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+function FormLabel({ title }) {
+  return <Text style={styles.label}>{title}</Text>;
+}
+
+function ErrorText({ message }) {
+  if (!message) {
+    return null;
+  }
+
+  return <Text style={styles.errorText}>{message}</Text>;
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+
+    backgroundColor: "#FDFCF8",
+  },
+
+  keyboardContainer: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 120,
+  },
+
+  headingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+
+    marginBottom: 18,
+  },
+
+  screenTitle: {
+    color: "#4A4A3A",
+    fontSize: 25,
+    fontWeight: "800",
+  },
+
+  screenSubtitle: {
+    color: "#A1A18E",
+    fontSize: 12,
+
+    marginTop: 4,
+  },
+
+  headingIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#F3F1E9",
+  },
+
+  sellerPreview: {
+    minHeight: 72,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    backgroundColor: "#FFFFFF",
+
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+
+    borderWidth: 1,
+    borderColor: "#E8E4D9",
+    borderRadius: 18,
+
+    marginBottom: 18,
+  },
+
+  sellerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#E8E4D9",
+
+    overflow: "hidden",
+    marginRight: 11,
+  },
+
+  sellerAvatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  sellerPreviewInfo: {
+    flex: 1,
+  },
+
+  sellerPreviewLabel: {
+    color: "#A1A18E",
+    fontSize: 10,
+  },
+
+  sellerPreviewName: {
+    color: "#4A4A3A",
+    fontSize: 14,
+    fontWeight: "800",
+
+    marginTop: 2,
+  },
+
+  sellerPreviewEmail: {
+    color: "#A1A18E",
+    fontSize: 9,
+
+    marginTop: 2,
+  },
+
+  imageUpload: {
+    width: "100%",
+    height: 190,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#F3F1E9",
+
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#E8E4D9",
+    borderRadius: 24,
+
+    overflow: "hidden",
+  },
+
+  uploadContent: {
+    alignItems: "center",
+  },
+
+  cameraIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#FFFFFF",
+  },
+
+  uploadTitle: {
+    color: "#6D6D5D",
+    fontSize: 14,
+    fontWeight: "800",
+
+    marginTop: 11,
+  },
+
+  uploadDescription: {
+    color: "#A1A18E",
+    fontSize: 11,
+
+    marginTop: 4,
+  },
+
+  selectedImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+
+    padding: 12,
+  },
+
+  changeImageBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+
+    backgroundColor: "rgba(74, 74, 58, 0.85)",
+
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+
+    borderRadius: 18,
+  },
+
+  changeImageText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+
+    marginLeft: 6,
+  },
+
+  label: {
+    color: "#A1A18E",
+    fontSize: 10,
+    fontWeight: "800",
+
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+
+    marginTop: 18,
+    marginBottom: 8,
+  },
+
+  input: {
+    minHeight: 50,
+
+    color: "#5D5D4D",
+    fontSize: 14,
+    fontWeight: "500",
+
+    backgroundColor: "#FFFFFF",
+
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+
+    borderWidth: 1,
+    borderColor: "#E8E4D9",
+    borderRadius: 16,
+  },
+
+  inputWithIcon: {
+    minHeight: 50,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    backgroundColor: "#FFFFFF",
+
+    paddingHorizontal: 14,
+
+    borderWidth: 1,
+    borderColor: "#E8E4D9",
+    borderRadius: 16,
+  },
+
+  iconInput: {
+    flex: 1,
+    height: 50,
+
+    color: "#5D5D4D",
+    fontSize: 14,
+    fontWeight: "500",
+
+    paddingHorizontal: 10,
+  },
+
+  currencyText: {
+    color: "#7A8450",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  pickerContainer: {
+    height: 54,
+
+    justifyContent: "center",
+
+    backgroundColor: "#FFFFFF",
+
+    borderWidth: 1,
+    borderColor: "#E8E4D9",
+    borderRadius: 16,
+
+    overflow: "hidden",
+  },
+
+  picker: {
+    color: "#5D5D4D",
+  },
+
+  descriptionInput: {
+    minHeight: 125,
+  },
+
+  descriptionFooter: {
+    minHeight: 20,
+
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  characterCount: {
+    color: "#A1A18E",
+    fontSize: 10,
+
+    marginTop: 5,
+    marginLeft: "auto",
+  },
+
+  inputErrorBorder: {
+    borderColor: "#C75C5C",
+  },
+
+  errorText: {
+    color: "#C75C5C",
+    fontSize: 11,
+    fontWeight: "600",
+
+    marginTop: 5,
+  },
+
+  submitButton: {
+    height: 55,
+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#8B5E3C",
+
+    borderRadius: 17,
+    marginTop: 28,
+
+    elevation: 4,
+  },
+
+  disabledButton: {
+    opacity: 0.65,
+  },
+
+  submitText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+
+    marginLeft: 8,
+  },
+});
