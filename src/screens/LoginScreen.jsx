@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
@@ -12,10 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-
 import { useAuth } from "../context/AuthContext";
 
 const initialFormData = {
@@ -25,15 +22,10 @@ const initialFormData = {
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
-
   const [formData, setFormData] = useState(initialFormData);
-
   const [errors, setErrors] = useState({});
-
   const [showPassword, setShowPassword] = useState(false);
-
   const [submitting, setSubmitting] = useState(false);
-
   const updateField = (field, value) => {
     setFormData((previousData) => ({
       ...previousData,

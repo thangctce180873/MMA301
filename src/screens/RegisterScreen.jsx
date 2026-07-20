@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
@@ -13,16 +12,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-
 import BackButton from "../components/BackButton";
-
 import { useAuth } from "../context/AuthContext";
-
 import { formatBirthDateInput } from "../utils/authUtils";
 
 const initialFormData = {
@@ -37,17 +31,11 @@ const initialFormData = {
 
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
-
   const [formData, setFormData] = useState(initialFormData);
-
   const [errors, setErrors] = useState({});
-
   const [showPassword, setShowPassword] = useState(false);
-
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   const [submitting, setSubmitting] = useState(false);
-
   const updateField = (field, value) => {
     setFormData((previousData) => ({
       ...previousData,

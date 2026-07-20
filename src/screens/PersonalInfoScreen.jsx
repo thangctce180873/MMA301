@@ -20,11 +20,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 
 import BackButton from "../components/BackButton";
-
 import { useAuth } from "../context/AuthContext";
 
 import {
-  deleteCurrentUser,
   formatBirthDateInput,
   getUserInitials,
   validateProfileData,
@@ -32,18 +30,14 @@ import {
 
 const createFormData = (user) => ({
   avatarUri: user?.avatarUri || "",
-
   name: user?.name || "",
-
   birthDate: user?.birthDate || "",
-
   email: user?.email || "",
-
   phone: user?.phone || "",
 });
 
 export default function PersonalInfoScreen({ navigation }) {
-  const { user, updateProfile, logout } = useAuth();
+  const { user, updateProfile, deleteAccount } = useAuth();
 
   const [formData, setFormData] = useState(() => createFormData(user));
 
@@ -80,7 +74,6 @@ export default function PersonalInfoScreen({ navigation }) {
 
   const handleCancelEditing = () => {
     setFormData(createFormData(user));
-
     setErrors({});
     setIsEditing(false);
   };
@@ -102,7 +95,6 @@ export default function PersonalInfoScreen({ navigation }) {
         {
           text: "Quay lại",
           style: "destructive",
-
           onPress: () => navigation.goBack(),
         },
       ],
@@ -161,7 +153,6 @@ export default function PersonalInfoScreen({ navigation }) {
         {
           text: "Xóa",
           style: "destructive",
-
           onPress: () => updateField("avatarUri", ""),
         },
       ],
@@ -186,14 +177,6 @@ export default function PersonalInfoScreen({ navigation }) {
       setSaving(true);
       setErrors({});
 
-      const emailChanged =
-        String(user?.email || "")
-          .trim()
-          .toLowerCase() !==
-        String(formData.email || "")
-          .trim()
-          .toLowerCase();
-
       const result = await updateProfile(formData);
 
       if (!result.success) {
@@ -210,9 +193,7 @@ export default function PersonalInfoScreen({ navigation }) {
 
       Alert.alert(
         "Cập nhật thành công",
-        emailChanged
-          ? "Thông tin đã được cập nhật. Lần đăng nhập sau hãy sử dụng email mới."
-          : "Thông tin cá nhân của bạn đã được cập nhật.",
+        "Thông tin cá nhân của bạn đã được cập nhật.",
       );
     } catch (error) {
       console.error("Lỗi khi lưu thông tin:", error);
@@ -227,42 +208,27 @@ export default function PersonalInfoScreen({ navigation }) {
     try {
       setDeletingAccount(true);
 
-      const result = await deleteCurrentUser();
+      const result = await deleteAccount();
 
       if (!result.success) {
         Alert.alert("Xóa tài khoản thất bại", result.message);
 
-        setDeletingAccount(false);
         return;
       }
 
       Alert.alert(
         "Đã xóa tài khoản",
         "Tài khoản và toàn bộ dữ liệu liên quan đã được xóa.",
-        [
-          {
-            text: "OK",
-
-            onPress: async () => {
-              setDeletingAccount(false);
-
-              await logout();
-            },
-          },
-        ],
-        {
-          cancelable: false,
-        },
       );
     } catch (error) {
       console.error("Lỗi khi xóa tài khoản:", error);
-
-      setDeletingAccount(false);
 
       Alert.alert(
         "Có lỗi xảy ra",
         "Không thể xóa tài khoản. Vui lòng thử lại.",
       );
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -273,7 +239,7 @@ export default function PersonalInfoScreen({ navigation }) {
 
     Alert.alert(
       "Xóa tài khoản",
-      "Khi xóa tài khoản, toàn bộ tin đăng và dữ liệu đã lưu của bạn cũng sẽ bị xóa. Bạn có muốn tiếp tục không?",
+      "Toàn bộ tin đăng và dữ liệu đã lưu của bạn cũng sẽ bị xóa. Bạn có muốn tiếp tục không?",
       [
         {
           text: "Hủy",
@@ -282,11 +248,10 @@ export default function PersonalInfoScreen({ navigation }) {
         {
           text: "Tiếp tục",
           style: "destructive",
-
           onPress: () => {
             Alert.alert(
               "Xác nhận lần cuối",
-              "Hành động này không thể hoàn tác. Bạn chắc chắn muốn xóa vĩnh viễn tài khoản?",
+              "Hành động này không thể hoàn tác. Bạn chắc chắn muốn xóa tài khoản?",
               [
                 {
                   text: "Không",
@@ -294,9 +259,7 @@ export default function PersonalInfoScreen({ navigation }) {
                 },
                 {
                   text: "Xóa vĩnh viễn",
-
                   style: "destructive",
-
                   onPress: performDeleteAccount,
                 },
               ],
@@ -337,7 +300,6 @@ export default function PersonalInfoScreen({ navigation }) {
               disabled={deletingAccount}
               style={[
                 styles.headerActionButton,
-
                 deletingAccount && styles.disabledButton,
               ]}
               onPress={handleStartEditing}
@@ -495,6 +457,32 @@ export default function PersonalInfoScreen({ navigation }) {
             />
           </View>
 
+          <Text style={styles.sectionLabel}>BẢO MẬT</Text>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            disabled={isEditing || saving || deletingAccount}
+            style={[
+              styles.securityOption,
+              (isEditing || saving || deletingAccount) && styles.disabledButton,
+            ]}
+            onPress={() => navigation.navigate("ChangePassword")}
+          >
+            <View style={styles.securityIcon}>
+              <Ionicons name="key-outline" size={22} color="#7A8450" />
+            </View>
+
+            <View style={styles.securityInfo}>
+              <Text style={styles.securityTitle}>Đổi mật khẩu</Text>
+
+              <Text style={styles.securityDescription}>
+                Cập nhật mật khẩu đăng nhập
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={20} color="#A1A18E" />
+          </TouchableOpacity>
+
           {isEditing ? (
             <View style={styles.actionContainer}>
               <TouchableOpacity
@@ -529,7 +517,6 @@ export default function PersonalInfoScreen({ navigation }) {
               disabled={deletingAccount}
               style={[
                 styles.editButton,
-
                 deletingAccount && styles.disabledButton,
               ]}
               onPress={handleStartEditing}
@@ -564,7 +551,6 @@ export default function PersonalInfoScreen({ navigation }) {
               disabled={isEditing || saving || deletingAccount}
               style={[
                 styles.deleteAccountButton,
-
                 (isEditing || saving || deletingAccount) &&
                   styles.disabledButton,
               ]}
@@ -580,12 +566,6 @@ export default function PersonalInfoScreen({ navigation }) {
                 </>
               )}
             </TouchableOpacity>
-
-            {isEditing ? (
-              <Text style={styles.deleteDisabledNote}>
-                Hãy lưu hoặc hủy chỉnh sửa trước khi xóa tài khoản.
-              </Text>
-            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -613,9 +593,7 @@ function FormField({
       <View
         style={[
           styles.inputContainer,
-
           editable && styles.editableInputContainer,
-
           error && styles.errorInputContainer,
         ]}
       >
@@ -1021,6 +999,53 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
+  securityOption: {
+    minHeight: 76,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    backgroundColor: "#FFFFFF",
+
+    paddingHorizontal: 15,
+
+    borderWidth: 1,
+    borderColor: "#E8E4D9",
+    borderRadius: 20,
+
+    elevation: 2,
+  },
+
+  securityIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#F3F1E9",
+
+    marginRight: 12,
+  },
+
+  securityInfo: {
+    flex: 1,
+  },
+
+  securityTitle: {
+    color: "#4A4A3A",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  securityDescription: {
+    color: "#A1A18E",
+    fontSize: 10,
+
+    marginTop: 3,
+  },
+
   actionContainer: {
     flexDirection: "row",
 
@@ -1164,16 +1189,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
 
     marginLeft: 7,
-  },
-
-  deleteDisabledNote: {
-    color: "#B78888",
-    fontSize: 9,
-    lineHeight: 14,
-
-    textAlign: "center",
-
-    marginTop: 8,
   },
 
   disabledButton: {

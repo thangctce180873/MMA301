@@ -92,7 +92,6 @@ export const getAllItems = async () => {
 
     return parsedItems.sort((firstItem, secondItem) => {
       const firstTime = new Date(firstItem.createdAt || 0).getTime();
-
       const secondTime = new Date(secondItem.createdAt || 0).getTime();
 
       return secondTime - firstTime;
@@ -121,48 +120,29 @@ export const saveItems = async (items) => {
 export const addItem = async (itemData) => {
   try {
     const items = await getAllItems();
-
     const currentTime = new Date().toISOString();
-
     const newItem = {
       id: generateId(),
 
       title: String(itemData.title || "").trim(),
-
       price: Number(itemData.price),
-
       condition: itemData.condition,
-
       category: itemData.category,
-
       imageUri: itemData.imageUri || null,
-
       description: String(itemData.description || "").trim(),
-
       location: String(itemData.location || "").trim(),
-
       sellerId: itemData.sellerId ? String(itemData.sellerId) : null,
-
       sellerEmail: normalizeOwnerEmail(itemData.sellerEmail),
-
       sellerName: String(itemData.sellerName || "").trim() || "Người bán",
-
       sellerPhone: normalizePhoneNumber(itemData.sellerPhone),
-
       sellerAvatar: itemData.sellerAvatar || null,
-
       status: "selling",
-
-      // Mỗi phần tử là ID tài khoản đã lưu sản phẩm
-      favoriteUserIds: [],
-
+      favoriteUserIds: [], // Mỗi phần tử là ID tài khoản đã lưu sản phẩm
       createdAt: currentTime,
-
       updatedAt: currentTime,
     };
 
     const updatedItems = [newItem, ...items];
-
     const saved = await saveItems(updatedItems);
 
     if (!saved) {
@@ -194,7 +174,6 @@ export const getItemById = async (id) => {
 export const updateItem = async (id, updates) => {
   try {
     const items = await getAllItems();
-
     const itemExists = items.some((item) => String(item.id) === String(id));
 
     if (!itemExists) {
@@ -250,7 +229,6 @@ export const updateItem = async (id, updates) => {
 export const deleteItem = async (id, currentUser) => {
   try {
     const items = await getAllItems();
-
     const item = items.find(
       (currentItem) => String(currentItem.id) === String(id),
     );
@@ -320,17 +298,13 @@ export const toggleFavorite = async (id, currentUser) => {
     }
 
     const currentItem = items[itemIndex];
-
     const favoriteUserIds = Array.isArray(currentItem.favoriteUserIds)
       ? currentItem.favoriteUserIds.map((userId) => String(userId))
       : [];
-
     const alreadyFavorite = favoriteUserIds.includes(favoriteUserId);
-
     const updatedFavoriteUserIds = alreadyFavorite
       ? favoriteUserIds.filter((userId) => userId !== favoriteUserId)
       : [...favoriteUserIds, favoriteUserId];
-
     const updatedItem = {
       ...currentItem,
 
@@ -338,11 +312,8 @@ export const toggleFavorite = async (id, currentUser) => {
 
       updatedAt: new Date().toISOString(),
     };
-
     const updatedItems = [...items];
-
     updatedItems[itemIndex] = updatedItem;
-
     const saved = await saveItems(updatedItems);
 
     if (!saved) {

@@ -1,5 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
-
+import React, { memo, useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,19 +11,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
-
 import { useFocusEffect } from "@react-navigation/native";
-
 import { useAuth } from "../context/AuthContext";
-
 import { getUserInitials } from "../utils/authUtils";
-
 import { categories } from "../utils/categories";
-
 import {
   filterItems,
   formatPrice,
@@ -34,19 +26,103 @@ import {
 
 const APP_BAR_HEIGHT = 64;
 
+/*
+ * Component này được đặt bên ngoài HomeScreen.
+ * Nhờ đó, khi searchQuery thay đổi, TextInput không bị unmount
+ * và không bị mất focus sau mỗi ký tự.
+ */
+const HomeListHeader = memo(function HomeListHeader({
+  searchQuery,
+  onChangeSearch,
+  onClearSearch,
+  activeCategory,
+  onChangeCategory,
+  resultCount,
+}) {
+  return (
+    <>
+      {/* Thanh tìm kiếm */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={21} color="#A1A18E" />
+
+          <TextInput
+            value={searchQuery}
+            onChangeText={onChangeSearch}
+            placeholder="Tìm sách, đồ điện tử, đồ dùng..."
+            placeholderTextColor="#A1A18E"
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="never"
+            style={styles.searchInput}
+          />
+
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onClearSearch}
+              accessibilityRole="button"
+              accessibilityLabel="Xóa nội dung tìm kiếm"
+            >
+              <Ionicons name="close-circle" size={19} color="#A1A18E" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Danh mục */}
+      <View style={styles.categorySection}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.categoryContent}
+        >
+          {categories.map((category) => {
+            const isActive = activeCategory === category.id;
+
+            return (
+              <TouchableOpacity
+                key={category.id}
+                activeOpacity={0.8}
+                style={[
+                  styles.categoryButton,
+                  isActive && styles.activeCategoryButton,
+                ]}
+                onPress={() => onChangeCategory(category.id)}
+              >
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    isActive && styles.activeCategoryButtonText,
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Tiêu đề danh sách */}
+      <View style={styles.listTitleRow}>
+        <Text style={styles.listTitle}>Tin đăng mới nhất</Text>
+
+        <Text style={styles.resultCount}>{resultCount} sản phẩm</Text>
+      </View>
+    </>
+  );
+});
+
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
-
   const [items, setItems] = useState([]);
-
   const [activeCategory, setActiveCategory] = useState("all");
-
   const [searchQuery, setSearchQuery] = useState("");
-
   const [loading, setLoading] = useState(true);
-
   const [refreshing, setRefreshing] = useState(false);
-
   const loadItems = useCallback(async () => {
     try {
       const storedItems = await getAllItems();
@@ -68,115 +144,157 @@ export default function HomeScreen({ navigation }) {
     }, [loadItems]),
   );
 
+  /*
+   * Chỉ hiển thị các sản phẩm chưa đánh dấu đã bán.
+   */
   const visibleItems = useMemo(() => {
     const sellingItems = items.filter((item) => item.status !== "sold");
 
     return filterItems(sellingItems, searchQuery, activeCategory);
   }, [items, searchQuery, activeCategory]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
     loadItems();
-  };
+  }, [loadItems]);
 
-  const getCategoryName = (categoryId) => {
+  const handleChangeSearch = useCallback((value) => {
+    setSearchQuery(value);
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery("");
+  }, []);
+
+  const handleChangeCategory = useCallback((categoryId) => {
+    setActiveCategory(categoryId);
+  }, []);
+
+  const getCategoryName = useCallback((categoryId) => {
     const category = categories.find(
       (currentCategory) => currentCategory.id === categoryId,
     );
 
     return category?.name || "Khác";
-  };
+  }, []);
 
-  const openProfile = () => {
+  const openProfile = useCallback(() => {
     navigation.navigate("Profile");
-  };
+  }, [navigation]);
 
-  const openDetail = (itemId) => {
-    navigation.navigate("Detail", {
-      itemId,
-    });
-  };
+  const openDetail = useCallback(
+    (itemId) => {
+      navigation.navigate("Detail", {
+        itemId,
+      });
+    },
+    [navigation],
+  );
 
-  const renderProduct = ({ item }) => {
-    const sellerInitial = getUserInitials(item.sellerName);
+  const renderProduct = useCallback(
+    ({ item }) => {
+      const sellerInitial = getUserInitials(item.sellerName);
 
-    return (
-      <TouchableOpacity
-        activeOpacity={0.86}
-        style={styles.productCard}
-        onPress={() => openDetail(item.id)}
-      >
-        <View style={styles.productImageContainer}>
-          {item.imageUri ? (
-            <Image
-              source={{
-                uri: item.imageUri,
-              }}
-              style={styles.productImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Ionicons name="image-outline" size={42} color="#A1A18E" />
+      return (
+        <TouchableOpacity
+          activeOpacity={0.86}
+          style={styles.productCard}
+          onPress={() => openDetail(item.id)}
+        >
+          <View style={styles.productImageContainer}>
+            {item.imageUri ? (
+              <Image
+                source={{
+                  uri: item.imageUri,
+                }}
+                style={styles.productImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Ionicons name="image-outline" size={42} color="#A1A18E" />
+              </View>
+            )}
+
+            <View style={styles.conditionBadge}>
+              <Text style={styles.conditionText}>
+                {item.condition || "Chưa rõ"}
+              </Text>
             </View>
-          )}
+          </View>
 
-          <View style={styles.conditionBadge}>
-            <Text style={styles.conditionText}>
-              {item.condition || "Chưa rõ"}
+          <View style={styles.productContent}>
+            <Text style={styles.categoryName}>
+              {getCategoryName(item.category)}
             </Text>
-          </View>
-        </View>
 
-        <View style={styles.productContent}>
-          <Text style={styles.categoryName}>
-            {getCategoryName(item.category)}
-          </Text>
+            <Text
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              style={styles.productTitle}
+            >
+              {item.title}
+            </Text>
 
-          <Text
-            numberOfLines={2}
-            ellipsizeMode="tail"
-            style={styles.productTitle}
-          >
-            {item.title}
-          </Text>
+            <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
 
-          <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
+            <View style={styles.sellerDivider} />
 
-          <View style={styles.sellerDivider} />
+            <View style={styles.sellerRow}>
+              <View style={styles.sellerAvatar}>
+                {item.sellerAvatar ? (
+                  <Image
+                    source={{
+                      uri: item.sellerAvatar,
+                    }}
+                    style={styles.sellerAvatarImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.sellerAvatarText}>{sellerInitial}</Text>
+                )}
+              </View>
 
-          <View style={styles.sellerRow}>
-            <View style={styles.sellerAvatar}>
-              {item.sellerAvatar ? (
-                <Image
-                  source={{
-                    uri: item.sellerAvatar,
-                  }}
-                  style={styles.sellerAvatarImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text style={styles.sellerAvatarText}>{sellerInitial}</Text>
-              )}
-            </View>
+              <View style={styles.sellerInfo}>
+                <Text numberOfLines={1} style={styles.sellerName}>
+                  {item.sellerName || "Người bán"}
+                </Text>
 
-            <View style={styles.sellerInfo}>
-              <Text numberOfLines={1} style={styles.sellerName}>
-                {item.sellerName || "Người bán"}
-              </Text>
-
-              <Text style={styles.productTime}>
-                {formatTimeAgo(item.createdAt)}
-              </Text>
+                <Text style={styles.productTime}>
+                  {formatTimeAgo(item.createdAt)}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        </TouchableOpacity>
+      );
+    },
+    [getCategoryName, openDetail],
+  );
 
-  const renderEmpty = () => {
-    return (
+  const listHeader = useMemo(
+    () => (
+      <HomeListHeader
+        searchQuery={searchQuery}
+        onChangeSearch={handleChangeSearch}
+        onClearSearch={handleClearSearch}
+        activeCategory={activeCategory}
+        onChangeCategory={handleChangeCategory}
+        resultCount={visibleItems.length}
+      />
+    ),
+    [
+      searchQuery,
+      handleChangeSearch,
+      handleClearSearch,
+      activeCategory,
+      handleChangeCategory,
+      visibleItems.length,
+    ],
+  );
+
+  const listEmpty = useMemo(
+    () => (
       <View style={styles.emptyContainer}>
         <View style={styles.emptyIcon}>
           <Ionicons name="search-outline" size={43} color="#A1A18E" />
@@ -188,82 +306,9 @@ export default function HomeScreen({ navigation }) {
           Hãy thử tìm kiếm bằng từ khóa hoặc danh mục khác.
         </Text>
       </View>
-    );
-  };
-
-  const renderListHeader = () => {
-    return (
-      <>
-        {/* Thanh tìm kiếm */}
-        <View style={styles.searchSection}>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={21} color="#A1A18E" />
-
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Tìm sách, đồ điện tử, đồ dùng..."
-              placeholderTextColor="#A1A18E"
-              returnKeyType="search"
-              style={styles.searchInput}
-            />
-
-            {searchQuery ? (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setSearchQuery("")}
-              >
-                <Ionicons name="close-circle" size={19} color="#A1A18E" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
-
-        {/* Danh mục */}
-        <View style={styles.categorySection}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryContent}
-          >
-            {categories.map((category) => {
-              const isActive = activeCategory === category.id;
-
-              return (
-                <TouchableOpacity
-                  key={category.id}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.categoryButton,
-
-                    isActive && styles.activeCategoryButton,
-                  ]}
-                  onPress={() => setActiveCategory(category.id)}
-                >
-                  <Text
-                    style={[
-                      styles.categoryButtonText,
-
-                      isActive && styles.activeCategoryButtonText,
-                    ]}
-                  >
-                    {category.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Tiêu đề danh sách */}
-        <View style={styles.listTitleRow}>
-          <Text style={styles.listTitle}>Tin đăng mới nhất</Text>
-
-          <Text style={styles.resultCount}>{visibleItems.length} sản phẩm</Text>
-        </View>
-      </>
-    );
-  };
+    ),
+    [],
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -314,10 +359,11 @@ export default function HomeScreen({ navigation }) {
           numColumns={2}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderProduct}
-          ListHeaderComponent={renderListHeader}
-          ListEmptyComponent={renderEmpty}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={listEmpty}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           columnWrapperStyle={
             visibleItems.length > 0 ? styles.productRow : undefined
           }
@@ -342,10 +388,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FDFCF8",
   },
 
-  /*
-   * Chiều cao này bằng với
-   * chiều cao nội dung thanh tab dưới.
-   */
   headerCard: {
     height: APP_BAR_HEIGHT,
 
@@ -469,6 +511,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
 
     paddingHorizontal: 10,
+    paddingVertical: 0,
   },
 
   categorySection: {

@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
@@ -11,21 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
-
 import { useFocusEffect } from "@react-navigation/native";
-
 import BackButton from "../components/BackButton";
-
 import { useAuth } from "../context/AuthContext";
-
 import { getUserInitials } from "../utils/authUtils";
-
 import { categories } from "../utils/categories";
-
 import {
   deleteItem,
   formatPrice,
@@ -39,15 +30,10 @@ import {
 
 export default function DetailScreen({ route, navigation }) {
   const { user } = useAuth();
-
   const itemId = route.params?.itemId;
-
   const [item, setItem] = useState(null);
-
   const [loading, setLoading] = useState(true);
-
   const [processing, setProcessing] = useState(false);
-
   const loadItem = useCallback(async () => {
     try {
       setLoading(true);
@@ -76,15 +62,11 @@ export default function DetailScreen({ route, navigation }) {
   );
 
   const ownerOfCurrentItem = isItemOwner(item, user);
-
   const currentItemIsFavorite = isItemFavorite(item, user);
-
   const categoryName =
     categories.find((category) => category.id === item?.category)?.name ||
     "Khác";
-
   const sellerInitial = getUserInitials(item?.sellerName);
-
   const handleToggleFavorite = async () => {
     if (!item || processing) {
       return;

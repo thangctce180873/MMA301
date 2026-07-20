@@ -6,12 +6,13 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import MainTabs from "./MainTabs";
 
+import ChangePasswordScreen from "../screens/ChangePasswordScreen";
 import DetailScreen from "../screens/DetailScreen";
 import LoginScreen from "../screens/LoginScreen";
-import RegisterScreen from "../screens/RegisterScreen";
-import ManageListingsScreen from "../screens/ManageListingsScreen";
 import ManageFavoritesScreen from "../screens/ManageFavoritesScreen";
+import ManageListingsScreen from "../screens/ManageListingsScreen";
 import PersonalInfoScreen from "../screens/PersonalInfoScreen";
+import RegisterScreen from "../screens/RegisterScreen";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -34,9 +35,7 @@ export default function RootStack() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-
         animation: "slide_from_right",
-
         contentStyle: {
           backgroundColor: "#FDFCF8",
         },
@@ -59,6 +58,11 @@ export default function RootStack() {
           />
 
           <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+
+          <Stack.Screen
+            name="ChangePassword"
+            component={ChangePasswordScreen}
+          />
         </>
       ) : (
         <>

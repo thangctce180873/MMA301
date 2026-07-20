@@ -7,6 +7,8 @@ import React, {
 } from "react";
 
 import {
+  changeCurrentUserPassword,
+  deleteCurrentUser,
   getCurrentUser,
   loginUser,
   logoutUser,
@@ -22,47 +24,37 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    restoreSession();
+    const loadSession = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+
+        setUser(currentUser);
+      } catch (error) {
+        console.error("Lỗi khi tải phiên đăng nhập:", error);
+
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSession();
   }, []);
 
-  const restoreSession = async () => {
-    try {
-      const currentUser = await getCurrentUser();
+  const register = async (data) => {
+    const result = await registerUser(data);
 
-      setUser(currentUser);
-    } catch (error) {
-      console.error("Lỗi khi khôi phục phiên:", error);
-
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const register = async (formData) => {
-    const result = await registerUser(formData);
-
-    if (result.success) {
+    if (result.success && result.user) {
       setUser(result.user);
     }
 
     return result;
   };
 
-  const login = async (formData) => {
-    const result = await loginUser(formData);
+  const login = async (data) => {
+    const result = await loginUser(data);
 
-    if (result.success) {
-      setUser(result.user);
-    }
-
-    return result;
-  };
-
-  const updateProfile = async (updates) => {
-    const result = await updateCurrentUser(updates);
-
-    if (result.success) {
+    if (result.success && result.user) {
       setUser(result.user);
     }
 
@@ -79,18 +71,47 @@ export function AuthProvider({ children }) {
     return result;
   };
 
+  const updateProfile = async (updates) => {
+    const result = await updateCurrentUser(updates);
+
+    if (result.success && result.user) {
+      setUser(result.user);
+    }
+
+    return result;
+  };
+
+  const changePassword = async (data) => {
+    const result = await changeCurrentUserPassword(data);
+
+    if (result.success && result.user) {
+      setUser(result.user);
+    }
+
+    return result;
+  };
+
+  const deleteAccount = async () => {
+    const result = await deleteCurrentUser();
+
+    if (result.success) {
+      setUser(null);
+    }
+
+    return result;
+  };
+
   const contextValue = useMemo(
     () => ({
       user,
       loading,
-
       isAuthenticated: Boolean(user),
-
       register,
       login,
       logout,
       updateProfile,
-      restoreSession,
+      changePassword,
+      deleteAccount,
     }),
     [user, loading],
   );

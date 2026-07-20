@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from "react";
-
 import {
   ActivityIndicator,
   FlatList,
@@ -10,19 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
-
 import { useFocusEffect } from "@react-navigation/native";
-
 import BackButton from "../components/BackButton";
-
 import { useAuth } from "../context/AuthContext";
-
 import { categories } from "../utils/categories";
-
 import {
   formatPrice,
   formatTimeAgo,
@@ -31,13 +23,9 @@ import {
 
 export default function ManageFavoritesScreen({ navigation }) {
   const { user } = useAuth();
-
   const [items, setItems] = useState([]);
-
   const [loading, setLoading] = useState(true);
-
   const [refreshing, setRefreshing] = useState(false);
-
   const loadItems = useCallback(async () => {
     try {
       const favoriteItems = await getFavoriteItems(user);

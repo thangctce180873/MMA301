@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
@@ -13,21 +12,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
-
 import { Picker } from "@react-native-picker/picker";
-
 import * as ImagePicker from "expo-image-picker";
-
 import { useAuth } from "../context/AuthContext";
-
 import { categories, productConditions } from "../utils/categories";
-
 import { addItem, validateItem } from "../utils/itemUtils";
-
 const createInitialFormData = (user) => ({
   imageUri: "",
   title: "",

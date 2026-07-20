@@ -1,5 +1,4 @@
 import React, { useCallback, useMemo, useState } from "react";
-
 import {
   ActivityIndicator,
   FlatList,
@@ -10,19 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
-
 import { useFocusEffect } from "@react-navigation/native";
-
 import BackButton from "../components/BackButton";
-
 import { useAuth } from "../context/AuthContext";
-
 import { categories } from "../utils/categories";
-
 import { formatPrice, formatTimeAgo, getUserItems } from "../utils/itemUtils";
 
 const filters = [
@@ -42,15 +34,10 @@ const filters = [
 
 export default function ManageListingsScreen({ navigation }) {
   const { user } = useAuth();
-
   const [items, setItems] = useState([]);
-
   const [activeFilter, setActiveFilter] = useState("all");
-
   const [loading, setLoading] = useState(true);
-
   const [refreshing, setRefreshing] = useState(false);
-
   const loadItems = useCallback(async () => {
     try {
       const userItems = await getUserItems(user);

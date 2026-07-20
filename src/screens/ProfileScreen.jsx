@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
@@ -12,27 +11,18 @@ import {
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-
 import { useFocusEffect } from "@react-navigation/native";
-
 import { useAuth } from "../context/AuthContext";
-
 import { getUserInitials } from "../utils/authUtils";
-
 import { getFavoriteCount, getUserListingCount } from "../utils/itemUtils";
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout, updateProfile } = useAuth();
-
   const [totalListingCount, setTotalListingCount] = useState(0);
-
   const [favoriteCount, setFavoriteCount] = useState(0);
-
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
-
   const loadCounts = useCallback(async () => {
     try {
       if (!user) {

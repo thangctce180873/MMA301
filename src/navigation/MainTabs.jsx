@@ -1,20 +1,14 @@
 import React from "react";
 import { StyleSheet } from "react-native";
-
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
-
 import HomeScreen from "../screens/HomeScreen";
 import AddScreen from "../screens/AddScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
-
 const APP_BAR_HEIGHT = 64;
-
 const getTabIcon = (routeName, focused) => {
   switch (routeName) {
     case "Home":

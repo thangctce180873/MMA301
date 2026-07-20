@@ -56,7 +56,6 @@ export const isValidBirthDate = (birthDate) => {
   }
 
   const today = new Date();
-
   today.setHours(23, 59, 59, 999);
 
   return date.getTime() <= today.getTime();
@@ -83,7 +82,7 @@ export const getUserInitials = (name) => {
 const hashPassword = async (password) => {
   return await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
-    String(password),
+    String(password || ""),
   );
 };
 
@@ -104,15 +103,10 @@ export const validateRegisterData = (data) => {
   const errors = {};
 
   const name = String(data.name || "").trim();
-
   const birthDate = String(data.birthDate || "").trim();
-
   const email = normalizeEmail(data.email);
-
   const phone = normalizePhoneNumber(data.phone);
-
   const password = String(data.password || "");
-
   const confirmPassword = String(data.confirmPassword || "");
 
   if (!name) {
@@ -162,7 +156,6 @@ export const validateLoginData = (data) => {
   const errors = {};
 
   const email = normalizeEmail(data.email);
-
   const password = String(data.password || "");
 
   if (!email) {
@@ -185,11 +178,8 @@ export const validateProfileData = (data) => {
   const errors = {};
 
   const name = String(data.name || "").trim();
-
   const birthDate = String(data.birthDate || "").trim();
-
   const email = normalizeEmail(data.email);
-
   const phone = normalizePhoneNumber(data.phone);
 
   if (!name) {
@@ -213,6 +203,39 @@ export const validateProfileData = (data) => {
     errors.phone = "Vui lòng nhập số điện thoại";
   } else if (!/^0\d{9}$/.test(phone)) {
     errors.phone = "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0";
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+};
+
+export const validateChangePasswordData = (data) => {
+  const errors = {};
+
+  const currentPassword = String(data.currentPassword || "");
+
+  const newPassword = String(data.newPassword || "");
+
+  const confirmPassword = String(data.confirmPassword || "");
+
+  if (!currentPassword) {
+    errors.currentPassword = "Vui lòng nhập mật khẩu hiện tại";
+  }
+
+  if (!newPassword) {
+    errors.newPassword = "Vui lòng nhập mật khẩu mới";
+  } else if (newPassword.length < 6) {
+    errors.newPassword = "Mật khẩu mới phải có ít nhất 6 ký tự";
+  } else if (newPassword === currentPassword) {
+    errors.newPassword = "Mật khẩu mới phải khác mật khẩu hiện tại";
+  }
+
+  if (!confirmPassword) {
+    errors.confirmPassword = "Vui lòng xác nhận mật khẩu mới";
+  } else if (newPassword && confirmPassword !== newPassword) {
+    errors.confirmPassword = "Mật khẩu xác nhận không khớp";
   }
 
   return {
@@ -245,7 +268,7 @@ const saveUsers = async (users) => {
 
     return true;
   } catch (error) {
-    console.error("Lỗi khi lưu người dùng:", error);
+    console.error("Lỗi khi lưu danh sách người dùng:", error);
 
     return false;
   }
@@ -271,15 +294,15 @@ const syncUserListings = async (previousUser, updatedUser) => {
       return;
     }
 
-    const items = JSON.parse(storedItems);
+    const parsedItems = JSON.parse(storedItems);
 
-    if (!Array.isArray(items)) {
+    if (!Array.isArray(parsedItems)) {
       return;
     }
 
     const previousEmail = normalizeEmail(previousUser?.email);
 
-    const updatedItems = items.map((item) => {
+    const updatedItems = parsedItems.map((item) => {
       const matchesById =
         item.sellerId &&
         updatedUser.id &&
@@ -297,17 +320,11 @@ const syncUserListings = async (previousUser, updatedUser) => {
 
       return {
         ...item,
-
         sellerId: String(updatedUser.id),
-
         sellerEmail: normalizeEmail(updatedUser.email),
-
         sellerName: updatedUser.name || "Người bán",
-
         sellerPhone: normalizePhoneNumber(updatedUser.phone),
-
         sellerAvatar: updatedUser.avatarUri || null,
-
         updatedAt: new Date().toISOString(),
       };
     });
@@ -331,7 +348,6 @@ export const registerUser = async (data) => {
     }
 
     const users = await getAllUsers();
-
     const email = normalizeEmail(data.email);
 
     const existingUser = users.find(
@@ -354,21 +370,13 @@ export const registerUser = async (data) => {
 
     const newUser = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-
       name: String(data.name).trim(),
-
       birthDate: String(data.birthDate).trim(),
-
       email,
-
       phone: normalizePhoneNumber(data.phone),
-
       avatarUri: data.avatarUri || "",
-
       passwordHash,
-
       createdAt: currentTime,
-
       updatedAt: currentTime,
     };
 
@@ -420,7 +428,6 @@ export const loginUser = async (data) => {
     }
 
     const users = await getAllUsers();
-
     const email = normalizeEmail(data.email);
 
     const user = users.find(
@@ -566,12 +573,10 @@ export const updateCurrentUser = async (updates) => {
     const updatedUser = {
       ...previousUser,
       ...profileData,
-
       updatedAt: new Date().toISOString(),
     };
 
     const updatedUsers = [...users];
-
     updatedUsers[userIndex] = updatedUser;
 
     const usersSaved = await saveUsers(updatedUsers);
@@ -611,7 +616,110 @@ export const updateCurrentUser = async (updates) => {
   }
 };
 
-// Xóa tài khoản đang đăng nhập
+export const changeCurrentUserPassword = async (data) => {
+  try {
+    const validation = validateChangePasswordData(data);
+
+    if (!validation.isValid) {
+      return {
+        success: false,
+        message: "Thông tin đổi mật khẩu chưa hợp lệ",
+        errors: validation.errors,
+      };
+    }
+
+    const currentSessionUser = await getCurrentUser();
+
+    if (!currentSessionUser) {
+      return {
+        success: false,
+        message: "Phiên đăng nhập đã hết hạn",
+      };
+    }
+
+    const users = await getAllUsers();
+
+    const userIndex = users.findIndex(
+      (user) => String(user.id) === String(currentSessionUser.id),
+    );
+
+    if (userIndex === -1) {
+      return {
+        success: false,
+        message: "Không tìm thấy tài khoản",
+      };
+    }
+
+    const currentUser = users[userIndex];
+
+    const currentPasswordHash = await hashPassword(data.currentPassword);
+
+    if (currentUser.passwordHash !== currentPasswordHash) {
+      return {
+        success: false,
+        message: "Mật khẩu hiện tại không chính xác",
+        errors: {
+          currentPassword: "Mật khẩu hiện tại không chính xác",
+        },
+      };
+    }
+
+    const newPasswordHash = await hashPassword(data.newPassword);
+
+    if (newPasswordHash === currentUser.passwordHash) {
+      return {
+        success: false,
+        message: "Mật khẩu mới phải khác mật khẩu hiện tại",
+        errors: {
+          newPassword: "Mật khẩu mới phải khác mật khẩu hiện tại",
+        },
+      };
+    }
+
+    const updatedUser = {
+      ...currentUser,
+      passwordHash: newPasswordHash,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedUsers = [...users];
+    updatedUsers[userIndex] = updatedUser;
+
+    const usersSaved = await saveUsers(updatedUsers);
+
+    if (!usersSaved) {
+      return {
+        success: false,
+        message: "Không thể cập nhật mật khẩu",
+      };
+    }
+
+    const publicUser = createPublicUser(updatedUser);
+
+    const sessionSaved = await saveSession(publicUser);
+
+    if (!sessionSaved) {
+      return {
+        success: false,
+        message: "Mật khẩu đã đổi nhưng không thể cập nhật phiên đăng nhập",
+      };
+    }
+
+    return {
+      success: true,
+      message: "Đổi mật khẩu thành công",
+      user: publicUser,
+    };
+  } catch (error) {
+    console.error("Lỗi khi đổi mật khẩu:", error);
+
+    return {
+      success: false,
+      message: "Có lỗi xảy ra khi đổi mật khẩu",
+    };
+  }
+};
+
 export const deleteCurrentUser = async () => {
   try {
     const currentUser = await getCurrentUser();
@@ -625,26 +733,21 @@ export const deleteCurrentUser = async () => {
 
     const users = await getAllUsers();
 
-    const userExists = users.some(
-      (user) => String(user.id) === String(currentUser.id),
-    );
-
-    if (!userExists) {
-      return {
-        success: false,
-        message: "Không tìm thấy tài khoản",
-      };
-    }
-
     const remainingUsers = users.filter(
       (user) => String(user.id) !== String(currentUser.id),
     );
 
     const storedItems = await AsyncStorage.getItem(ITEMS_KEY);
 
-    const parsedItems = storedItems ? JSON.parse(storedItems) : [];
+    let items = [];
 
-    const items = Array.isArray(parsedItems) ? parsedItems : [];
+    if (storedItems) {
+      const parsedItems = JSON.parse(storedItems);
+
+      if (Array.isArray(parsedItems)) {
+        items = parsedItems;
+      }
+    }
 
     const currentUserId = String(currentUser.id);
 
@@ -671,7 +774,6 @@ export const deleteCurrentUser = async () => {
 
         return {
           ...item,
-
           favoriteUserIds: favoriteUserIds.filter(
             (favoriteUserId) =>
               favoriteUserId !== currentUserId &&
