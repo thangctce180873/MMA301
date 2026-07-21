@@ -12,6 +12,7 @@ import AddScreen from "../screens/AddScreen";
 import ConversationsScreen from "../screens/ConversationsScreen";
 import HomeScreen from "../screens/HomeScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import GiveawayScreen from "../screens/GiveawayScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -24,6 +25,9 @@ const getTabIcon = (routeName, focused) => {
 
     case "Add":
       return focused ? "add-circle" : "add-circle-outline";
+
+    case "Giveaway":
+      return focused ? "gift" : "gift-outline";
 
     case "MessagesTab":
       return focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline";
@@ -99,6 +103,14 @@ export default function MainTabs() {
         component={AddScreen}
         options={{
           title: "Đăng bán",
+        }}
+      />
+
+      <Tab.Screen
+        name="Giveaway"
+        component={GiveawayScreen}
+        options={{
+          title: "0 Đồng",
         }}
       />
 

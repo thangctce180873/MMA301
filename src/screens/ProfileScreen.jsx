@@ -321,8 +321,16 @@ export default function ProfileScreen({ navigation }) {
             icon="cube-outline"
             title="Quản lý tin đăng"
             description={`${totalListingCount} tin đăng của bạn`}
-            showBorder={false}
+            showBorder={true}
             onPress={() => navigation.navigate("ManageListings")}
+          />
+
+          <MenuItem
+            icon="bar-chart-outline"
+            title="Thống kê gian hàng"
+            description="Xem hiệu suất bán hàng của bạn"
+            showBorder={false}
+            onPress={() => navigation.navigate("SellerDashboard")}
           />
         </View>
 

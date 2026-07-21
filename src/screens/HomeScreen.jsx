@@ -52,7 +52,7 @@ const homeBanners = [
     title: "ƯU ĐÃI ĐỒ SINH VIÊN",
     subtitle: "Giảm giá đến 80% cho nhiều sản phẩm",
     backgroundImage:
-      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80",
     buttonText: "Khám phá",
     action: "explore",
   },
@@ -61,7 +61,7 @@ const homeBanners = [
     title: "SẢN PHẨM GIÁ TỐT",
     subtitle: "Khám phá đồ dùng phù hợp với túi tiền sinh viên",
     backgroundImage:
-      "https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1555529771-835f59fc5efe?auto=format&fit=crop&w=1200&q=80",
     buttonText: "Xem ngay",
     action: "explore",
   },
@@ -70,7 +70,7 @@ const homeBanners = [
     title: "ĐĂNG TIN NHANH CHÓNG",
     subtitle: "Thanh lý đồ cũ dễ dàng chỉ trong vài bước",
     backgroundImage:
-      "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80",
     buttonText: "Đăng bán",
     action: "add",
   },
@@ -489,6 +489,8 @@ const HomeHeader = memo(function HomeHeader({
 
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = useMemo(() => (screenWidth - 32) * 0.483, [screenWidth]);
 
   const [items, setItems] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
@@ -529,10 +531,20 @@ export default function HomeScreen({ navigation }) {
     }, [loadHomeData]),
   );
 
-  const visibleItems = useMemo(() => {
-    const sellingItems = items.filter((item) => item.status !== "sold");
+  const freeItems = useMemo(() => {
+    return items.filter((item) => item.status === "selling" && Number(item.price) === 0);
+  }, [items]);
 
-    return filterItems(sellingItems, searchQuery, activeCategory);
+  const visibleItems = useMemo(() => {
+    const sellingItems = items.filter((item) => item.status === "selling");
+
+    if (activeCategory === "free") {
+      const filteredFree = sellingItems.filter((item) => Number(item.price) === 0);
+      return filterItems(filteredFree, searchQuery, "all");
+    }
+
+    const nonFreeSellingItems = sellingItems.filter((item) => Number(item.price) > 0);
+    return filterItems(nonFreeSellingItems, searchQuery, activeCategory);
   }, [items, searchQuery, activeCategory]);
 
   const handleRefresh = useCallback(() => {
@@ -703,6 +715,93 @@ export default function HomeScreen({ navigation }) {
     [user, getCategoryName, openDetail, handleToggleFavorite],
   );
 
+  const renderFreeProduct = useCallback(
+    ({ item }) => {
+      const sellerInitial = getUserInitials(item.sellerName);
+      const saved = isItemFavorite(item, user);
+
+      return (
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={[styles.productCard, { width: cardWidth, marginRight: 12 }]}
+          onPress={() => openDetail(item.id)}
+        >
+          <View style={styles.productImageWrap}>
+            {item.imageUri ? (
+              <Image
+                source={{ uri: item.imageUri }}
+                style={styles.productImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.productImagePlaceholder}>
+                <Ionicons
+                  name="image-outline"
+                  size={36}
+                  color={COLORS.textLight}
+                />
+              </View>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.saveButton}
+              onPress={() => handleToggleFavorite(item.id)}
+            >
+              <Ionicons
+                name={saved ? "bookmark" : "bookmark-outline"}
+                size={17}
+                color={COLORS.primary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.productInfo}>
+            <Text style={styles.productCategory}>
+              {getCategoryName(item.category)}
+            </Text>
+
+            <Text numberOfLines={2} style={styles.productTitle}>
+              {item.title}
+            </Text>
+
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+              <Text style={[styles.productPrice, { fontSize: 13, color: COLORS.primaryDark, marginTop: 0 }]}>MIỄN PHÍ</Text>
+              <Ionicons name="gift" size={14} color={COLORS.primary} style={{ marginLeft: 4 }} />
+            </View>
+
+            <View style={styles.productMetaRow}>
+              <View style={styles.sellerMiniAvatar}>
+                {item.sellerAvatar ? (
+                  <Image
+                    source={{ uri: item.sellerAvatar }}
+                    style={styles.sellerMiniAvatarImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.sellerMiniAvatarText}>
+                    {sellerInitial}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.sellerMetaTextWrap}>
+                <Text numberOfLines={1} style={styles.sellerName}>
+                  {item.sellerName || "Người bán"}
+                </Text>
+
+                <Text style={styles.productTime}>
+                  {formatTimeAgo(item.createdAt)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [user, getCategoryName, openDetail, handleToggleFavorite, cardWidth],
+  );
+
   const listHeader = useMemo(
     () => (
       <>
@@ -720,7 +819,7 @@ export default function HomeScreen({ navigation }) {
         />
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Nổi bật</Text>
+          <Text style={styles.sectionTitle}>Đang bán</Text>
 
           <TouchableOpacity activeOpacity={0.8} onPress={handleSeeAll}>
             <Text style={styles.seeAllText}>Xem tất cả</Text>
@@ -760,6 +859,8 @@ export default function HomeScreen({ navigation }) {
     [],
   );
 
+  const listFooter = useMemo(() => null, []);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -780,6 +881,7 @@ export default function HomeScreen({ navigation }) {
         keyExtractor={(item) => String(item.id)}
         renderItem={renderProduct}
         ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
         ListEmptyComponent={listEmpty}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -931,6 +1033,25 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 
+  emptyButtonText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: "800",
+
+    marginLeft: 6,
+  },
+
+  freeSectionContainer: {
+    marginTop: 20,
+    paddingBottom: 20,
+    backgroundColor: COLORS.background,
+  },
+  
+  freeListContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  
   heroDescriptionText: {
     color: COLORS.text,
     fontSize: 12,
@@ -1113,7 +1234,7 @@ const styles = StyleSheet.create({
   },
 
   shortcutItem: {
-    width: "20%",
+    flex: 1,
     alignItems: "center",
   },
 

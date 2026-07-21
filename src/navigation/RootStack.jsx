@@ -19,6 +19,10 @@ import ChangePasswordScreen from "../screens/ChangePasswordScreen";
 import ManageFavoritesScreen from "../screens/ManageFavoritesScreen";
 import ManageListingsScreen from "../screens/ManageListingsScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import SellerProfileScreen from "../screens/SellerProfileScreen";
+import RatingReviewScreen from "../screens/RatingReviewScreen";
+import SellerDashboardScreen from "../screens/SellerDashboardScreen";
+import EditScreen from "../screens/EditScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -75,6 +79,11 @@ export default function RootStack() {
           />
 
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          
+          <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
+          <Stack.Screen name="RatingReview" component={RatingReviewScreen} />
+          <Stack.Screen name="SellerDashboard" component={SellerDashboardScreen} />
+          <Stack.Screen name="Edit" component={EditScreen} />
         </>
       ) : (
         <>

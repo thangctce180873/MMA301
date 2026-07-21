@@ -24,23 +24,22 @@ import { useAuth } from "../context/AuthContext";
 
 import { categories, productConditions } from "../utils/categories";
 
-import { addItem, validateItem } from "../utils/itemUtils";
+import { updateItem, validateItem } from "../utils/itemUtils";
 
-const createInitialFormData = (user) => ({
-  imageUri: "",
-  title: "",
-  price: "",
-  condition: "Tốt",
-  category: "books",
-  description: "",
-  location: "",
-  sellerPhone: user?.phone || "",
-});
-
-export default function AddScreen({ navigation }) {
+export default function EditScreen({ route, navigation }) {
   const { user } = useAuth();
+  const { item } = route.params;
 
-  const [formData, setFormData] = useState(() => createInitialFormData(user));
+  const [formData, setFormData] = useState({
+    imageUri: item.imageUri || "",
+    title: item.title || "",
+    price: String(item.price || ""),
+    condition: item.condition || "Tốt",
+    category: item.category || "books",
+    description: item.description || "",
+    location: item.location || "",
+    sellerPhone: item.sellerPhone || user?.phone || "",
+  });
 
   const [errors, setErrors] = useState({});
 
@@ -124,39 +123,23 @@ export default function AddScreen({ navigation }) {
     try {
       setSubmitting(true);
 
-      const newItem = await addItem({
+      const success = await updateItem(item.id, {
         ...formData,
-
-        sellerId: user.id,
-        sellerEmail: user.email,
-
-        sellerName: user.name || "Người bán",
-
-        sellerAvatar: user.avatarUri || null,
-        
         status,
       });
 
-      if (!newItem) {
-        Alert.alert("Đăng tin thất bại", "Không thể lưu sản phẩm.");
-
+      if (!success) {
+        Alert.alert("Cập nhật thất bại", "Không thể lưu thay đổi.");
         return;
       }
 
-      resetForm();
-
-      const isDraft = status === "draft";
       Alert.alert(
-        isDraft ? "Lưu nháp thành công" : "Đăng tin thành công",
-        isDraft ? "Bản nháp đã được lưu vào quản lý tin đăng." : "Sản phẩm đã được thêm vào danh sách.",
+        "Cập nhật thành công",
+        "Sản phẩm đã được cập nhật.",
         [
           {
-            text: "Tiếp tục đăng",
-            style: "cancel",
-          },
-          {
-            text: "Xem danh sách",
-            onPress: () => navigation.navigate("Home"),
+            text: "Quay lại",
+            onPress: () => navigation.goBack(),
           },
         ],
       );
@@ -182,16 +165,16 @@ export default function AddScreen({ navigation }) {
         >
           <View style={styles.headingContainer}>
             <View>
-              <Text style={styles.screenTitle}>Đăng tin mới</Text>
+              <Text style={styles.screenTitle}>Sửa tin đăng</Text>
 
               <Text style={styles.screenSubtitle}>
-                Người bán: {user?.name || "Người dùng"}
+                Chỉnh sửa thông tin sản phẩm
               </Text>
             </View>
 
             <View style={styles.headingIcon}>
               <Ionicons
-                name="add-circle-outline"
+                name="pencil-outline"
                 size={25}
                 color={COLORS.primary}
               />
@@ -449,28 +432,28 @@ export default function AddScreen({ navigation }) {
               activeOpacity={0.85}
               disabled={submitting}
               style={[styles.draftButton, submitting && styles.disabledButton]}
-              onPress={() => handleSubmit("draft")}
+              onPress={() => navigation.goBack()}
             >
-              <Text style={styles.draftText}>LƯU NHÁP</Text>
+              <Text style={styles.draftText}>HỦY</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.85}
               disabled={submitting}
               style={[styles.submitButton, submitting && styles.disabledButton]}
-              onPress={() => handleSubmit("selling")}
+              onPress={() => handleSubmit(item.status)}
             >
               {submitting ? (
                 <ActivityIndicator color={COLORS.white} />
               ) : (
                 <>
                   <Ionicons
-                    name="cloud-upload-outline"
+                    name="save-outline"
                     size={21}
                     color={COLORS.white}
                   />
 
-                  <Text style={styles.submitText}>ĐĂNG TIN NGAY</Text>
+                  <Text style={styles.submitText}>LƯU THAY ĐỔI</Text>
                 </>
               )}
             </TouchableOpacity>

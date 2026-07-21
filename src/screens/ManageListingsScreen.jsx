@@ -29,8 +29,16 @@ const filters = [
     label: "Tất cả",
   },
   {
+    id: "draft",
+    label: "Bản nháp",
+  },
+  {
     id: "selling",
     label: "Đang bán",
+  },
+  {
+    id: "free",
+    label: "0 đồng",
   },
   {
     id: "sold",
@@ -73,12 +81,28 @@ export default function ManageListingsScreen({ navigation }) {
     if (activeFilter === "all") {
       return items;
     }
+    if (activeFilter === "free") {
+      return items.filter((item) => Number(item.price) === 0 && item.status === "selling");
+    }
+    if (activeFilter === "selling") {
+      return items.filter((item) => Number(item.price) > 0 && item.status === "selling");
+    }
 
     return items.filter((item) => item.status === activeFilter);
   }, [items, activeFilter]);
 
   const sellingCount = useMemo(
-    () => items.filter((item) => item.status === "selling").length,
+    () => items.filter((item) => item.status === "selling" && Number(item.price) > 0).length,
+    [items],
+  );
+
+  const freeCount = useMemo(
+    () => items.filter((item) => item.status === "selling" && Number(item.price) === 0).length,
+    [items],
+  );
+
+  const draftCount = useMemo(
+    () => items.filter((item) => item.status === "draft").length,
     [items],
   );
 
@@ -140,11 +164,11 @@ export default function ManageListingsScreen({ navigation }) {
             style={[
               styles.statusBadge,
 
-              sold ? styles.soldBadge : styles.sellingBadge,
+              sold ? styles.soldBadge : (item.status === "draft" ? styles.draftBadge : styles.sellingBadge),
             ]}
           >
             <Text style={styles.statusText}>
-              {sold ? "ĐÃ BÁN" : "ĐANG BÁN"}
+              {sold ? "ĐÃ BÁN" : (item.status === "draft" ? "BẢN NHÁP" : "ĐANG BÁN")}
             </Text>
           </View>
         </View>
@@ -197,14 +221,14 @@ export default function ManageListingsScreen({ navigation }) {
       </View>
 
       <View style={styles.summaryCard}>
-        <SummaryItem value={items.length} label="Tổng tin đăng" />
-
+        <SummaryItem value={items.length} label="Tổng tin" />
         <View style={styles.summaryDivider} />
-
+        <SummaryItem value={draftCount} label="Bản nháp" />
+        <View style={styles.summaryDivider} />
         <SummaryItem value={sellingCount} label="Đang bán" />
-
         <View style={styles.summaryDivider} />
-
+        <SummaryItem value={freeCount} label="0 đồng" />
+        <View style={styles.summaryDivider} />
         <SummaryItem value={soldCount} label="Đã bán" />
       </View>
 
@@ -513,6 +537,10 @@ const styles = StyleSheet.create({
 
   sellingBadge: {
     backgroundColor: COLORS.primary,
+  },
+
+  draftBadge: {
+    backgroundColor: COLORS.textMuted,
   },
 
   soldBadge: {

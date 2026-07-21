@@ -136,7 +136,7 @@ export const addItem = async (itemData) => {
       sellerName: String(itemData.sellerName || "").trim() || "Người bán",
       sellerPhone: normalizePhoneNumber(itemData.sellerPhone),
       sellerAvatar: itemData.sellerAvatar || null,
-      status: "selling",
+      status: itemData.status || "selling",
       favoriteUserIds: [], // Mỗi phần tử là ID tài khoản đã lưu sản phẩm
       createdAt: currentTime,
       updatedAt: currentTime,

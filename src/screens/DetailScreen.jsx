@@ -6,6 +6,7 @@ import {
   Alert,
   Image,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -32,6 +33,7 @@ import {
   isItemOwner,
   toggleFavorite,
   toggleSoldStatus,
+  updateItem,
 } from "../utils/itemUtils";
 
 export default function DetailScreen({ route, navigation }) {
@@ -202,6 +204,53 @@ export default function DetailScreen({ route, navigation }) {
     );
   };
 
+  const handlePublishDraft = async () => {
+    if (!item || !ownerOfCurrentItem || processing) {
+      return;
+    }
+
+    try {
+      setProcessing(true);
+
+      const success = await updateItem(item.id, { status: "selling" });
+
+      if (!success) {
+        Alert.alert(
+          "Không thể đăng bán",
+          "Có lỗi xảy ra khi cập nhật trạng thái sản phẩm.",
+        );
+        return;
+      }
+
+      await loadItem();
+    } catch (error) {
+      console.error("Lỗi cập nhật trạng thái:", error);
+      Alert.alert("Có lỗi xảy ra", "Không thể cập nhật trạng thái sản phẩm.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleOpenMap = useCallback(() => {
+    if (!item?.location) return;
+    const query = encodeURIComponent(item.location);
+    const url = Platform.select({
+      ios: `http://maps.apple.com/?q=${query}`,
+      android: `geo:0,0?q=${query}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${query}`,
+    });
+    
+    Linking.canOpenURL(url).then((supported) => {
+      if (supported) {
+        Linking.openURL(url);
+      } else {
+        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+      }
+    }).catch(() => {
+        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+    });
+  }, [item?.location]);
+
   const handleContactSeller = async () => {
     const phoneNumber = String(item?.sellerPhone || "").replace(/\D/g, "");
 
@@ -286,22 +335,26 @@ export default function DetailScreen({ route, navigation }) {
           <Text style={styles.headerSubtitle}>Thông tin tin đăng</Text>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.75}
-          disabled={processing}
-          style={styles.saveButton}
-          onPress={handleToggleFavorite}
-        >
-          {processing ? (
-            <ActivityIndicator size="small" color={COLORS.primary} />
-          ) : (
-            <Ionicons
-              name={currentItemIsFavorite ? "bookmark" : "bookmark-outline"}
-              size={23}
-              color={COLORS.primary}
-            />
-          )}
-        </TouchableOpacity>
+        {item.status !== "draft" ? (
+          <TouchableOpacity
+            activeOpacity={0.75}
+            disabled={processing}
+            style={styles.saveButton}
+            onPress={handleToggleFavorite}
+          >
+            {processing ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : (
+              <Ionicons
+                name={currentItemIsFavorite ? "bookmark" : "bookmark-outline"}
+                size={23}
+                color={COLORS.primary}
+              />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 42, height: 42 }} />
+        )}
       </View>
 
       <ScrollView
@@ -363,21 +416,44 @@ export default function DetailScreen({ route, navigation }) {
 
           <View style={styles.infoCard}>
             <InfoRow
-              icon="location-outline"
-              label="Địa điểm giao dịch"
-              value={item.location || "Chưa cập nhật"}
-            />
-
-            <View style={styles.infoDivider} />
-
-            <InfoRow
               icon="time-outline"
               label="Thời gian đăng"
               value={formatTimeAgo(item.createdAt)}
             />
           </View>
 
-          <View style={styles.sellerCard}>
+          <View style={styles.mapCard}>
+            <View style={styles.mapHeader}>
+              <Ionicons name="map" size={16} color={COLORS.primary} />
+              <Text style={styles.mapTitle}>Vị trí giao dịch</Text>
+            </View>
+            
+            <View style={styles.mapContentRow}>
+              <View style={styles.mapIconWrap}>
+                <Ionicons name="location-outline" size={24} color={COLORS.primaryDark} />
+              </View>
+              <View style={styles.mapTextWrap}>
+                <Text style={styles.mapAddress} numberOfLines={2}>{item.location || "Chưa có địa chỉ"}</Text>
+                <Text style={styles.mapHint}>Nhấn để mở bản đồ chỉ đường</Text>
+              </View>
+              <TouchableOpacity activeOpacity={0.8} style={styles.mapButton} onPress={handleOpenMap}>
+                <Ionicons name="navigate" size={20} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.sellerCard}
+            onPress={() =>
+              navigation.push("SellerProfile", {
+                sellerId: item.sellerId,
+                sellerEmail: item.sellerEmail,
+                sellerName: item.sellerName,
+                sellerAvatar: item.sellerAvatar,
+              })
+            }
+          >
             <View style={styles.sellerAvatar}>
               {item.sellerAvatar ? (
                 <Image
@@ -414,12 +490,12 @@ export default function DetailScreen({ route, navigation }) {
 
             <View style={styles.verifiedIcon}>
               <Ionicons
-                name="checkmark-circle"
-                size={23}
-                color={COLORS.success}
+                name="chevron-forward"
+                size={20}
+                color={COLORS.textMuted}
               />
             </View>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.descriptionCard}>
             <Text style={styles.descriptionTitle}>Mô tả chi tiết</Text>
@@ -430,24 +506,41 @@ export default function DetailScreen({ route, navigation }) {
             </Text>
           </View>
 
-          <TouchableOpacity
-            activeOpacity={0.85}
-            disabled={processing}
-            style={[styles.messageButton, processing && styles.disabledButton]}
-            onPress={handleOpenMessages}
-          >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={20}
-              color={COLORS.white}
-            />
+          {ownerOfCurrentItem && item.status === "draft" ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={processing}
+              style={[styles.messageButton, processing && styles.disabledButton]}
+              onPress={handlePublishDraft}
+            >
+              <Ionicons
+                name="cloud-upload-outline"
+                size={20}
+                color={COLORS.white}
+              />
 
-            <Text style={styles.messageButtonText}>
-              {ownerOfCurrentItem
-                ? "XEM TIN NHẮN NGƯỜI MUA"
-                : "NHẮN TIN VỚI NGƯỜI BÁN"}
-            </Text>
-          </TouchableOpacity>
+              <Text style={styles.messageButtonText}>ĐĂNG BÁN</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={processing}
+              style={[styles.messageButton, processing && styles.disabledButton]}
+              onPress={handleOpenMessages}
+            >
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={20}
+                color={COLORS.white}
+              />
+
+              <Text style={styles.messageButtonText}>
+                {ownerOfCurrentItem
+                  ? "XEM TIN NHẮN NGƯỜI MUA"
+                  : "NHẮN TIN VỚI NGƯỜI BÁN"}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {!ownerOfCurrentItem ? (
             <TouchableOpacity
@@ -464,33 +557,48 @@ export default function DetailScreen({ route, navigation }) {
 
           {ownerOfCurrentItem ? (
             <>
+              {item.status !== "draft" ? (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={processing}
+                  style={[
+                    styles.soldButton,
+
+                    item.status === "sold" && styles.sellingButton,
+
+                    processing && styles.disabledButton,
+                  ]}
+                  onPress={handleToggleSold}
+                >
+                  <Ionicons
+                    name={
+                      item.status === "sold"
+                        ? "refresh-outline"
+                        : "checkmark-circle-outline"
+                    }
+                    size={20}
+                    color={item.status === "sold" ? COLORS.white : COLORS.success}
+                  />
+
+                  <Text style={styles.soldButtonText}>
+                    {item.status === "sold"
+                      ? "ĐÁNH DẤU ĐANG BÁN"
+                      : "ĐÁNH DẤU ĐÃ BÁN"}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
               <TouchableOpacity
                 activeOpacity={0.85}
                 disabled={processing}
                 style={[
-                  styles.soldButton,
-
-                  item.status === "sold" && styles.sellingButton,
-
+                  styles.editButton,
                   processing && styles.disabledButton,
                 ]}
-                onPress={handleToggleSold}
+                onPress={() => navigation.navigate("Edit", { item })}
               >
-                <Ionicons
-                  name={
-                    item.status === "sold"
-                      ? "refresh-outline"
-                      : "checkmark-circle-outline"
-                  }
-                  size={20}
-                  color={item.status === "sold" ? COLORS.white : COLORS.success}
-                />
-
-                <Text style={styles.soldButtonText}>
-                  {item.status === "sold"
-                    ? "ĐÁNH DẤU ĐANG BÁN"
-                    : "ĐÁNH DẤU ĐÃ BÁN"}
-                </Text>
+                <Ionicons name="pencil-outline" size={20} color={COLORS.primary} />
+                <Text style={styles.editButtonText}>SỬA TIN</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -527,9 +635,9 @@ function InfoRow({ icon, label, value }) {
       </View>
 
       <View style={styles.infoContent}>
-        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoRowLabel}>{label}</Text>
 
-        <Text style={styles.infoValue}>{value}</Text>
+        <Text style={styles.infoRowValue}>{value}</Text>
       </View>
     </View>
   );
@@ -810,26 +918,85 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  infoLabel: {
+  infoRowLabel: {
     color: COLORS.textMuted,
-    fontSize: 9,
-    fontWeight: "700",
+    fontSize: 12,
   },
 
-  infoValue: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
+  infoRowValue: {
+    color: COLORS.text,
+    fontSize: 14,
     fontWeight: "700",
 
-    marginTop: 3,
+    marginTop: 2,
   },
 
   infoDivider: {
     height: 1,
-
     backgroundColor: COLORS.border,
 
-    marginLeft: 51,
+    marginVertical: 12,
+  },
+
+  mapCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 15,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  mapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  mapTitle: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginLeft: 6,
+  },
+  mapContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  mapIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  mapTextWrap: {
+    flex: 1,
+    marginRight: 10,
+  },
+  mapAddress: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  mapHint: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+  },
+  mapButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
 
   sellerCard: {
@@ -959,7 +1126,7 @@ const styles = StyleSheet.create({
 
   messageButtonText: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800",
 
     marginLeft: 8,
@@ -981,20 +1148,20 @@ const styles = StyleSheet.create({
 
   callButtonText: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800",
 
     marginLeft: 8,
   },
 
   soldButton: {
-    height: 52,
+    height: 53,
 
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: COLORS.primaryDark,
+    backgroundColor: COLORS.success,
 
     borderRadius: 17,
 
@@ -1007,14 +1174,30 @@ const styles = StyleSheet.create({
 
   soldButtonText: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800",
 
     marginLeft: 8,
   },
 
+  editButton: {
+    height: 53,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primarySoft,
+    borderRadius: 17,
+    marginTop: 12,
+  },
+  editButtonText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: "800",
+    marginLeft: 8,
+  },
+
   deleteButton: {
-    height: 50,
+    height: 53,
 
     flexDirection: "row",
     alignItems: "center",
@@ -1031,7 +1214,7 @@ const styles = StyleSheet.create({
 
   deleteButtonText: {
     color: COLORS.danger,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800",
 
     marginLeft: 8,
