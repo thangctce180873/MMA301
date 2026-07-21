@@ -1,6 +1,9 @@
+import { COLORS } from "../constants/colors";
 import React, { useCallback, useState } from "react";
+
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -9,28 +12,36 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+
 import BackButton from "../components/BackButton";
+
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../utils/categories";
+
 import {
   formatPrice,
   formatTimeAgo,
   getFavoriteItems,
+  toggleFavorite,
 } from "../utils/itemUtils";
 
 export default function ManageFavoritesScreen({ navigation }) {
   const { user } = useAuth();
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
+
   const loadItems = useCallback(async () => {
     try {
       const favoriteItems = await getFavoriteItems(user);
 
-      setItems(favoriteItems);
+      setItems(Array.isArray(favoriteItems) ? favoriteItems : []);
     } catch (error) {
       console.error("Lỗi khi tải sản phẩm đã lưu:", error);
 
@@ -53,20 +64,51 @@ export default function ManageFavoritesScreen({ navigation }) {
   };
 
   const getCategoryName = (categoryId) => {
-    const category = categories.find(
-      (currentCategory) => currentCategory.id === categoryId,
+    return (
+      categories.find((category) => category.id === categoryId)?.name || "Khác"
     );
+  };
 
-    return category?.name || "Khác";
+  const handleRemoveSavedItem = async (item) => {
+    if (removingId) {
+      return;
+    }
+
+    try {
+      setRemovingId(item.id);
+
+      const result = await toggleFavorite(item.id, user);
+
+      if (!result?.success) {
+        Alert.alert(
+          "Không thể cập nhật",
+          result?.message || "Không thể bỏ lưu sản phẩm.",
+        );
+
+        return;
+      }
+
+      setItems((previousItems) =>
+        previousItems.filter(
+          (currentItem) => String(currentItem.id) !== String(item.id),
+        ),
+      );
+    } catch (error) {
+      console.error("Lỗi khi bỏ lưu sản phẩm:", error);
+
+      Alert.alert("Có lỗi xảy ra", "Không thể bỏ lưu sản phẩm.");
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   const renderItem = ({ item }) => {
-    const isSold = item.status === "sold";
+    const removing = String(removingId) === String(item.id);
 
     return (
       <TouchableOpacity
-        activeOpacity={0.85}
-        style={[styles.productCard, isSold && styles.soldProductCard]}
+        activeOpacity={0.87}
+        style={styles.productCard}
         onPress={() =>
           navigation.navigate("Detail", {
             itemId: item.id,
@@ -84,115 +126,62 @@ export default function ManageFavoritesScreen({ navigation }) {
             />
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Ionicons name="image-outline" size={38} color="#A1A18E" />
+              <Ionicons
+                name="image-outline"
+                size={38}
+                color={COLORS.textMuted}
+              />
             </View>
           )}
 
-          <View style={styles.favoriteBadge}>
-            <Ionicons name="heart" size={17} color="#D97706" />
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            disabled={removing}
+            style={styles.savedButton}
+            onPress={() => handleRemoveSavedItem(item)}
+          >
+            {removing ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : (
+              <Ionicons name="bookmark" size={18} color={COLORS.primary} />
+            )}
+          </TouchableOpacity>
 
-          {isSold ? (
+          {item.status === "sold" ? (
             <View style={styles.soldBadge}>
-              <Text style={styles.soldBadgeText}>ĐÃ BÁN</Text>
+              <Text style={styles.soldText}>ĐÃ BÁN</Text>
             </View>
           ) : null}
         </View>
 
         <View style={styles.productContent}>
-          <View style={styles.categoryRow}>
-            <Text style={styles.categoryText}>
-              {getCategoryName(item.category)}
-            </Text>
+          <Text style={styles.categoryText}>
+            {getCategoryName(item.category)}
+          </Text>
 
-            <Text style={styles.conditionText}>
-              {item.condition || "Chưa rõ"}
-            </Text>
-          </View>
-
-          <Text
-            numberOfLines={2}
-            ellipsizeMode="tail"
-            style={styles.productTitle}
-          >
+          <Text numberOfLines={2} style={styles.productTitle}>
             {item.title}
           </Text>
 
           <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
 
-          <View style={styles.sellerRow}>
-            <View style={styles.sellerAvatar}>
-              {item.sellerAvatar ? (
-                <Image
-                  source={{
-                    uri: item.sellerAvatar,
-                  }}
-                  style={styles.sellerAvatarImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Text style={styles.sellerAvatarText}>
-                  {String(item.sellerName || "?")
-                    .charAt(0)
-                    .toUpperCase()}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.sellerInfo}>
-              <Text numberOfLines={1} style={styles.sellerName}>
-                {item.sellerName || "Người bán"}
-              </Text>
+          <View style={styles.productFooter}>
+            <View style={styles.timeRow}>
+              <Ionicons
+                name="time-outline"
+                size={13}
+                color={COLORS.textMuted}
+              />
 
               <Text style={styles.timeText}>
                 {formatTimeAgo(item.createdAt)}
               </Text>
             </View>
-          </View>
 
-          <View style={styles.bottomRow}>
-            <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={14} color="#A1A18E" />
-
-              <Text numberOfLines={1} style={styles.locationText}>
-                {item.location || "Chưa cập nhật địa điểm"}
-              </Text>
-            </View>
-
-            <Ionicons name="chevron-forward" size={18} color="#7A8450" />
+            <Ionicons name="chevron-forward" size={17} color={COLORS.primary} />
           </View>
         </View>
       </TouchableOpacity>
-    );
-  };
-
-  const renderEmpty = () => {
-    return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIcon}>
-          <Ionicons name="heart-outline" size={47} color="#A1A18E" />
-        </View>
-
-        <Text style={styles.emptyTitle}>Chưa có sản phẩm đã lưu</Text>
-
-        <Text style={styles.emptyDescription}>
-          Những sản phẩm bạn bấm biểu tượng trái tim sẽ xuất hiện tại đây.
-        </Text>
-
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.exploreButton}
-          onPress={() =>
-            navigation.navigate("MainTabs", {
-              screen: "Home",
-            })
-          }
-        >
-          <Ionicons name="search-outline" size={20} color="#FFFFFF" />
-
-          <Text style={styles.exploreButtonText}>KHÁM PHÁ SẢN PHẨM</Text>
-        </TouchableOpacity>
-      </View>
     );
   };
 
@@ -201,40 +190,36 @@ export default function ManageFavoritesScreen({ navigation }) {
       <View style={styles.header}>
         <BackButton onPress={() => navigation.goBack()} />
 
-        <View style={styles.headerText}>
+        <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>Sản phẩm đã lưu</Text>
 
-          <Text style={styles.headerSubtitle}>Những sản phẩm bạn quan tâm</Text>
+          <Text style={styles.headerSubtitle}>Danh sách sản phẩm đã lưu</Text>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.75}
-          style={styles.headerActionButton}
-          onPress={handleRefresh}
-        >
-          <Ionicons name="refresh-outline" size={23} color="#7A8450" />
-        </TouchableOpacity>
+        <View style={styles.headerBookmark}>
+          <Ionicons name="bookmark" size={22} color={COLORS.primary} />
+        </View>
       </View>
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryIcon}>
-          <Ionicons name="heart" size={23} color="#D97706" />
+          <Ionicons name="bookmark-outline" size={24} color={COLORS.primary} />
         </View>
 
         <View style={styles.summaryInfo}>
           <Text style={styles.summaryValue}>{items.length}</Text>
 
-          <Text style={styles.summaryLabel}>Sản phẩm đã lưu</Text>
+          <Text style={styles.summaryLabel}>Sản phẩm đang được lưu</Text>
         </View>
 
-        <Text style={styles.summaryDescription}>Tài khoản của bạn</Text>
+        <Text style={styles.summaryHint}>Nhấn dấu lưu để bỏ lưu</Text>
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#7A8450" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
 
-          <Text style={styles.loadingText}>Đang tải sản phẩm đã lưu...</Text>
+          <Text style={styles.loadingText}>Đang tải sản phẩm...</Text>
         </View>
       ) : (
         <FlatList
@@ -242,15 +227,53 @@ export default function ManageFavoritesScreen({ navigation }) {
           keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={[
+            styles.listContent,
+
+            items.length === 0 && styles.emptyListContent,
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#7A8450"
-              colors={["#7A8450"]}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
             />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIcon}>
+                <Ionicons
+                  name="bookmark-outline"
+                  size={46}
+                  color={COLORS.textMuted}
+                />
+              </View>
+
+              <Text style={styles.emptyTitle}>Chưa có sản phẩm đã lưu</Text>
+
+              <Text style={styles.emptyDescription}>
+                Nhấn biểu tượng lưu trên sản phẩm để lưu lại và xem sau.
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.exploreButton}
+                onPress={() =>
+                  navigation.navigate("MainTabs", {
+                    screen: "Home",
+                  })
+                }
+              >
+                <Ionicons
+                  name="search-outline"
+                  size={19}
+                  color={COLORS.white}
+                />
+
+                <Text style={styles.exploreButtonText}>KHÁM PHÁ SẢN PHẨM</Text>
+              </TouchableOpacity>
+            </View>
           }
         />
       )}
@@ -261,7 +284,7 @@ export default function ManageFavoritesScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FDFCF8",
+    backgroundColor: COLORS.background,
   },
 
   header: {
@@ -270,16 +293,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 14,
     paddingVertical: 10,
 
     borderBottomWidth: 1,
-    borderBottomColor: "#E8E4D9",
+    borderBottomColor: COLORS.border,
   },
 
-  headerActionButton: {
+  headerTextContainer: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  headerTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: "800",
+  },
+
+  headerSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+
+    marginTop: 2,
+  },
+
+  headerBookmark: {
     width: 42,
     height: 42,
     borderRadius: 14,
@@ -287,56 +328,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
-  },
-
-  headerText: {
-    flex: 1,
-    alignItems: "center",
-  },
-
-  headerTitle: {
-    color: "#4A4A3A",
-    fontSize: 17,
-    fontWeight: "800",
-  },
-
-  headerSubtitle: {
-    color: "#A1A18E",
-    fontSize: 10,
-    marginTop: 2,
+    backgroundColor: COLORS.primaryLight,
   },
 
   summaryCard: {
-    minHeight: 78,
+    minHeight: 76,
 
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.primarySoft,
+
+    paddingHorizontal: 15,
 
     marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 15,
+    marginTop: 15,
+    marginBottom: 4,
 
-    paddingHorizontal: 16,
-
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
     borderRadius: 20,
-
-    elevation: 2,
   },
 
   summaryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 45,
+    height: 45,
+    borderRadius: 15,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#FFF7E8",
+    backgroundColor: COLORS.card,
 
     marginRight: 12,
   },
@@ -346,22 +366,27 @@ const styles = StyleSheet.create({
   },
 
   summaryValue: {
-    color: "#4A4A3A",
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: "800",
   },
 
   summaryLabel: {
-    color: "#8A8A75",
-    fontSize: 10,
+    color: COLORS.textSecondary,
+    fontSize: 9,
     fontWeight: "700",
 
-    marginTop: 1,
+    marginTop: 2,
   },
 
-  summaryDescription: {
-    color: "#A1A18E",
-    fontSize: 9,
+  summaryHint: {
+    maxWidth: 80,
+
+    color: COLORS.textMuted,
+    fontSize: 8,
+    lineHeight: 12,
+
+    textAlign: "right",
   },
 
   loadingContainer: {
@@ -372,52 +397,47 @@ const styles = StyleSheet.create({
   },
 
   loadingText: {
-    color: "#8A8A75",
+    color: COLORS.textSecondary,
     fontSize: 13,
 
     marginTop: 12,
   },
 
   listContent: {
-    flexGrow: 1,
-
     paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 30,
   },
 
-  productCard: {
-    minHeight: 145,
-
-    flexDirection: "row",
-
-    backgroundColor: "#FFFFFF",
-
-    padding: 11,
-    marginBottom: 13,
-
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 20,
-
-    elevation: 2,
+  emptyListContent: {
+    flexGrow: 1,
   },
 
-  soldProductCard: {
-    opacity: 0.72,
+  productCard: {
+    flexDirection: "row",
+
+    backgroundColor: COLORS.card,
+
+    padding: 10,
+
+    marginBottom: 12,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
   },
 
   imageContainer: {
-    width: 120,
-    height: 120,
+    width: 112,
+    height: 112,
 
     position: "relative",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.imagePlaceholder,
 
     borderRadius: 16,
-    overflow: "hidden",
 
-    marginRight: 13,
+    overflow: "hidden",
   },
 
   productImage: {
@@ -432,19 +452,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  favoriteBadge: {
+  savedButton: {
     position: "absolute",
-    top: 7,
-    right: 7,
+    top: 8,
+    right: 8,
 
-    width: 31,
-    height: 31,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "rgba(255,255,255,0.94)",
+    backgroundColor: "rgba(255,255,255,0.95)",
   },
 
   soldBadge: {
@@ -452,139 +472,73 @@ const styles = StyleSheet.create({
     left: 7,
     bottom: 7,
 
-    backgroundColor: "rgba(139,94,60,0.94)",
+    backgroundColor: COLORS.primaryDark,
 
     paddingHorizontal: 8,
     paddingVertical: 5,
 
-    borderRadius: 8,
+    borderRadius: 9,
   },
 
-  soldBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 8,
+  soldText: {
+    color: COLORS.white,
+    fontSize: 7,
     fontWeight: "800",
   },
 
   productContent: {
     flex: 1,
-  },
 
-  categoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    paddingLeft: 12,
+    paddingVertical: 3,
   },
 
   categoryText: {
-    color: "#A1A18E",
-    fontSize: 9,
+    color: COLORS.primary,
+    fontSize: 8,
     fontWeight: "800",
-
     textTransform: "uppercase",
   },
 
-  conditionText: {
-    color: "#7A8450",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
   productTitle: {
-    color: "#4A4A3A",
-    fontSize: 15,
-    lineHeight: 20,
+    color: COLORS.text,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: "800",
 
-    marginTop: 5,
+    marginTop: 4,
   },
 
   priceText: {
-    color: "#7A8450",
+    color: COLORS.primaryDark,
     fontSize: 15,
     fontWeight: "800",
 
-    marginTop: 5,
+    marginTop: 7,
   },
 
-  sellerRow: {
+  productFooter: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
 
-    marginTop: 8,
+    marginTop: "auto",
   },
 
-  sellerAvatar: {
-    width: 27,
-    height: 27,
-    borderRadius: 14,
-
+  timeRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-
-    backgroundColor: "#E8E4D9",
-
-    overflow: "hidden",
-    marginRight: 7,
-  },
-
-  sellerAvatarImage: {
-    width: "100%",
-    height: "100%",
-  },
-
-  sellerAvatarText: {
-    color: "#8A8A75",
-    fontSize: 9,
-    fontWeight: "800",
-  },
-
-  sellerInfo: {
-    flex: 1,
-  },
-
-  sellerName: {
-    color: "#6D6D5D",
-    fontSize: 10,
-    fontWeight: "700",
   },
 
   timeText: {
-    color: "#A1A18E",
-    fontSize: 8,
-
-    marginTop: 1,
-  },
-
-  bottomRow: {
-    flexDirection: "row",
-    alignItems: "center",
-
-    marginTop: "auto",
-    paddingTop: 7,
-
-    borderTopWidth: 1,
-    borderTopColor: "#F3F1E9",
-  },
-
-  locationRow: {
-    flex: 1,
-
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  locationText: {
-    flex: 1,
-
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 9,
 
     marginLeft: 4,
   },
 
   emptyContainer: {
-    minHeight: 390,
+    flex: 1,
 
     alignItems: "center",
     justifyContent: "center",
@@ -593,18 +547,18 @@ const styles = StyleSheet.create({
   },
 
   emptyIcon: {
-    width: 86,
-    height: 86,
-    borderRadius: 28,
+    width: 88,
+    height: 88,
+    borderRadius: 27,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.primaryLight,
   },
 
   emptyTitle: {
-    color: "#4A4A3A",
+    color: COLORS.text,
     fontSize: 17,
     fontWeight: "800",
 
@@ -612,7 +566,7 @@ const styles = StyleSheet.create({
   },
 
   emptyDescription: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 12,
     lineHeight: 19,
 
@@ -628,17 +582,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#7A8450",
+    backgroundColor: COLORS.primary,
 
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
 
-    borderRadius: 15,
-    marginTop: 18,
+    borderRadius: 16,
+
+    marginTop: 19,
   },
 
   exploreButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
+    color: COLORS.white,
+    fontSize: 11,
     fontWeight: "800",
 
     marginLeft: 7,

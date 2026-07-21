@@ -1,4 +1,6 @@
+import { COLORS } from "../constants/colors";
 import React, { useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -12,13 +14,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
+
 import { useAuth } from "../context/AuthContext";
+
 import { categories, productConditions } from "../utils/categories";
+
 import { addItem, validateItem } from "../utils/itemUtils";
+
 const createInitialFormData = (user) => ({
   imageUri: "",
   title: "",
@@ -120,9 +127,7 @@ export default function AddScreen({ navigation }) {
       const newItem = await addItem({
         ...formData,
 
-        // Lưu thông tin định danh tài khoản đăng tin
         sellerId: user.id,
-
         sellerEmail: user.email,
 
         sellerName: user.name || "Người bán",
@@ -183,11 +188,14 @@ export default function AddScreen({ navigation }) {
             </View>
 
             <View style={styles.headingIcon}>
-              <Ionicons name="add-circle-outline" size={25} color="#7A8450" />
+              <Ionicons
+                name="add-circle-outline"
+                size={25}
+                color={COLORS.primary}
+              />
             </View>
           </View>
 
-          {/* Thông tin người đăng */}
           <View style={styles.sellerPreview}>
             <View style={styles.sellerAvatar}>
               {user?.avatarUri ? (
@@ -199,7 +207,11 @@ export default function AddScreen({ navigation }) {
                   resizeMode="cover"
                 />
               ) : (
-                <Ionicons name="person-outline" size={23} color="#8A8A75" />
+                <Ionicons
+                  name="person-outline"
+                  size={23}
+                  color={COLORS.primaryDark}
+                />
               )}
             </View>
 
@@ -215,10 +227,13 @@ export default function AddScreen({ navigation }) {
               </Text>
             </View>
 
-            <Ionicons name="checkmark-circle" size={22} color="#7A8450" />
+            <Ionicons
+              name="checkmark-circle"
+              size={22}
+              color={COLORS.success}
+            />
           </View>
 
-          {/* Ảnh sản phẩm */}
           <TouchableOpacity
             activeOpacity={0.85}
             style={[
@@ -240,7 +255,7 @@ export default function AddScreen({ navigation }) {
 
                 <View style={styles.imageOverlay}>
                   <View style={styles.changeImageBadge}>
-                    <Ionicons name="camera" size={18} color="#FFFFFF" />
+                    <Ionicons name="camera" size={18} color={COLORS.white} />
 
                     <Text style={styles.changeImageText}>Đổi ảnh</Text>
                   </View>
@@ -249,7 +264,11 @@ export default function AddScreen({ navigation }) {
             ) : (
               <View style={styles.uploadContent}>
                 <View style={styles.cameraIcon}>
-                  <Ionicons name="camera-outline" size={34} color="#7A8450" />
+                  <Ionicons
+                    name="camera-outline"
+                    size={34}
+                    color={COLORS.primary}
+                  />
                 </View>
 
                 <Text style={styles.uploadTitle}>Thêm ảnh sản phẩm</Text>
@@ -263,21 +282,19 @@ export default function AddScreen({ navigation }) {
 
           <ErrorText message={errors.imageUri} />
 
-          {/* Tiêu đề */}
           <FormLabel title="Tiêu đề" />
 
           <TextInput
             value={formData.title}
             onChangeText={(value) => updateField("title", value)}
             placeholder="VD: Giáo trình Giải tích 1"
-            placeholderTextColor="#A1A18E"
+            placeholderTextColor={COLORS.textMuted}
             maxLength={100}
             style={[styles.input, errors.title && styles.inputErrorBorder]}
           />
 
           <ErrorText message={errors.title} />
 
-          {/* Giá */}
           <FormLabel title="Giá bán (VNĐ)" />
 
           <View
@@ -287,19 +304,15 @@ export default function AddScreen({ navigation }) {
               errors.price && styles.inputErrorBorder,
             ]}
           >
-            <Ionicons name="cash-outline" size={20} color="#A1A18E" />
+            <Ionicons name="cash-outline" size={20} color={COLORS.textMuted} />
 
             <TextInput
               value={formData.price}
               onChangeText={(value) =>
-                updateField(
-                  "price",
-
-                  value.replace(/[^0-9]/g, ""),
-                )
+                updateField("price", value.replace(/[^0-9]/g, ""))
               }
               placeholder="0"
-              placeholderTextColor="#A1A18E"
+              placeholderTextColor={COLORS.textMuted}
               keyboardType="number-pad"
               style={styles.iconInput}
             />
@@ -309,7 +322,6 @@ export default function AddScreen({ navigation }) {
 
           <ErrorText message={errors.price} />
 
-          {/* Tình trạng */}
           <FormLabel title="Tình trạng" />
 
           <View style={styles.pickerContainer}>
@@ -317,7 +329,7 @@ export default function AddScreen({ navigation }) {
               selectedValue={formData.condition}
               onValueChange={(value) => updateField("condition", value)}
               style={styles.picker}
-              dropdownIconColor="#7A8450"
+              dropdownIconColor={COLORS.primary}
             >
               {productConditions.map((condition) => (
                 <Picker.Item
@@ -329,7 +341,6 @@ export default function AddScreen({ navigation }) {
             </Picker>
           </View>
 
-          {/* Danh mục */}
           <FormLabel title="Danh mục" />
 
           <View style={styles.pickerContainer}>
@@ -337,7 +348,7 @@ export default function AddScreen({ navigation }) {
               selectedValue={formData.category}
               onValueChange={(value) => updateField("category", value)}
               style={styles.picker}
-              dropdownIconColor="#7A8450"
+              dropdownIconColor={COLORS.primary}
             >
               {categories
                 .filter((category) => category.id !== "all")
@@ -351,7 +362,6 @@ export default function AddScreen({ navigation }) {
             </Picker>
           </View>
 
-          {/* Địa điểm */}
           <FormLabel title="Địa điểm giao dịch" />
 
           <View
@@ -361,13 +371,17 @@ export default function AddScreen({ navigation }) {
               errors.location && styles.inputErrorBorder,
             ]}
           >
-            <Ionicons name="location-outline" size={20} color="#A1A18E" />
+            <Ionicons
+              name="location-outline"
+              size={20}
+              color={COLORS.textMuted}
+            />
 
             <TextInput
               value={formData.location}
               onChangeText={(value) => updateField("location", value)}
               placeholder="VD: Ký túc xá khu A"
-              placeholderTextColor="#A1A18E"
+              placeholderTextColor={COLORS.textMuted}
               maxLength={100}
               style={styles.iconInput}
             />
@@ -375,7 +389,6 @@ export default function AddScreen({ navigation }) {
 
           <ErrorText message={errors.location} />
 
-          {/* Số điện thoại */}
           <FormLabel title="Số điện thoại người bán" />
 
           <View
@@ -385,19 +398,15 @@ export default function AddScreen({ navigation }) {
               errors.sellerPhone && styles.inputErrorBorder,
             ]}
           >
-            <Ionicons name="call-outline" size={20} color="#A1A18E" />
+            <Ionicons name="call-outline" size={20} color={COLORS.textMuted} />
 
             <TextInput
               value={formData.sellerPhone}
               onChangeText={(value) =>
-                updateField(
-                  "sellerPhone",
-
-                  value.replace(/[^0-9]/g, ""),
-                )
+                updateField("sellerPhone", value.replace(/[^0-9]/g, ""))
               }
               placeholder="VD: 0912345678"
-              placeholderTextColor="#A1A18E"
+              placeholderTextColor={COLORS.textMuted}
               keyboardType="phone-pad"
               maxLength={10}
               style={styles.iconInput}
@@ -406,14 +415,13 @@ export default function AddScreen({ navigation }) {
 
           <ErrorText message={errors.sellerPhone} />
 
-          {/* Mô tả */}
           <FormLabel title="Mô tả chi tiết" />
 
           <TextInput
             value={formData.description}
             onChangeText={(value) => updateField("description", value)}
             placeholder="Mô tả tình trạng sản phẩm, lý do bán..."
-            placeholderTextColor="#A1A18E"
+            placeholderTextColor={COLORS.textMuted}
             multiline
             maxLength={1000}
             textAlignVertical="top"
@@ -434,7 +442,6 @@ export default function AddScreen({ navigation }) {
             </Text>
           </View>
 
-          {/* Đăng tin */}
           <TouchableOpacity
             activeOpacity={0.85}
             disabled={submitting}
@@ -442,13 +449,13 @@ export default function AddScreen({ navigation }) {
             onPress={handleSubmit}
           >
             {submitting ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={COLORS.white} />
             ) : (
               <>
                 <Ionicons
                   name="cloud-upload-outline"
                   size={21}
-                  color="#FFFFFF"
+                  color={COLORS.white}
                 />
 
                 <Text style={styles.submitText}>ĐĂNG TIN NGAY</Text>
@@ -476,8 +483,7 @@ function ErrorText({ message }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-
-    backgroundColor: "#FDFCF8",
+    backgroundColor: COLORS.background,
   },
 
   keyboardContainer: {
@@ -499,13 +505,13 @@ const styles = StyleSheet.create({
   },
 
   screenTitle: {
-    color: "#4A4A3A",
+    color: COLORS.text,
     fontSize: 25,
     fontWeight: "800",
   },
 
   screenSubtitle: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 12,
 
     marginTop: 4,
@@ -519,7 +525,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.primaryLight,
   },
 
   sellerPreview: {
@@ -528,13 +534,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 14,
     paddingVertical: 10,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
+    borderColor: COLORS.border,
     borderRadius: 18,
 
     marginBottom: 18,
@@ -548,9 +554,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#E8E4D9",
+    backgroundColor: COLORS.primaryLight,
 
     overflow: "hidden",
+
     marginRight: 11,
   },
 
@@ -564,12 +571,12 @@ const styles = StyleSheet.create({
   },
 
   sellerPreviewLabel: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 10,
   },
 
   sellerPreviewName: {
-    color: "#4A4A3A",
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: "800",
 
@@ -577,7 +584,7 @@ const styles = StyleSheet.create({
   },
 
   sellerPreviewEmail: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 9,
 
     marginTop: 2,
@@ -590,11 +597,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.primarySoft,
 
     borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: "#E8E4D9",
+    borderColor: COLORS.border,
     borderRadius: 24,
 
     overflow: "hidden",
@@ -612,11 +619,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
   },
 
   uploadTitle: {
-    color: "#6D6D5D",
+    color: COLORS.textSecondary,
     fontSize: 14,
     fontWeight: "800",
 
@@ -624,7 +631,7 @@ const styles = StyleSheet.create({
   },
 
   uploadDescription: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 11,
 
     marginTop: 4,
@@ -648,7 +655,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "rgba(74, 74, 58, 0.85)",
+    backgroundColor: "rgba(48,43,73,0.85)",
 
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -657,7 +664,7 @@ const styles = StyleSheet.create({
   },
 
   changeImageText: {
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontSize: 11,
     fontWeight: "800",
 
@@ -665,7 +672,7 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 10,
     fontWeight: "800",
 
@@ -679,17 +686,17 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 50,
 
-    color: "#5D5D4D",
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: "500",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 15,
     paddingVertical: 12,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
+    borderColor: COLORS.border,
     borderRadius: 16,
   },
 
@@ -699,12 +706,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 14,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
+    borderColor: COLORS.border,
     borderRadius: 16,
   },
 
@@ -712,7 +719,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
 
-    color: "#5D5D4D",
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: "500",
 
@@ -720,7 +727,7 @@ const styles = StyleSheet.create({
   },
 
   currencyText: {
-    color: "#7A8450",
+    color: COLORS.primary,
     fontSize: 14,
     fontWeight: "800",
   },
@@ -730,17 +737,17 @@ const styles = StyleSheet.create({
 
     justifyContent: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
+    borderColor: COLORS.border,
     borderRadius: 16,
 
     overflow: "hidden",
   },
 
   picker: {
-    color: "#5D5D4D",
+    color: COLORS.text,
   },
 
   descriptionInput: {
@@ -755,7 +762,7 @@ const styles = StyleSheet.create({
   },
 
   characterCount: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 10,
 
     marginTop: 5,
@@ -763,11 +770,11 @@ const styles = StyleSheet.create({
   },
 
   inputErrorBorder: {
-    borderColor: "#C75C5C",
+    borderColor: COLORS.danger,
   },
 
   errorText: {
-    color: "#C75C5C",
+    color: COLORS.danger,
     fontSize: 11,
     fontWeight: "600",
 
@@ -781,9 +788,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#8B5E3C",
+    backgroundColor: COLORS.primary,
 
     borderRadius: 17,
+
     marginTop: 28,
 
     elevation: 4,
@@ -794,7 +802,7 @@ const styles = StyleSheet.create({
   },
 
   submitText: {
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontSize: 14,
     fontWeight: "800",
 

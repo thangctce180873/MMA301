@@ -18,22 +18,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import BackButton from "../components/BackButton";
-import { useAuth } from "../context/AuthContext";
 
-const initialFormData = {
-  currentPassword: "",
-  newPassword: "",
-  confirmPassword: "",
-};
+import { useAuth } from "../context/AuthContext";
 
 export default function ChangePasswordScreen({ navigation }) {
   const { changePassword } = useAuth();
 
-  const [formData, setFormData] = useState(initialFormData);
+  const [currentPassword, setCurrentPassword] = useState("");
 
-  const [errors, setErrors] = useState({});
+  const [newPassword, setNewPassword] = useState("");
 
-  const [submitting, setSubmitting] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 
@@ -41,11 +36,22 @@ export default function ChangePasswordScreen({ navigation }) {
 
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const updateField = (field, value) => {
-    setFormData((previousData) => ({
-      ...previousData,
-      [field]: value,
-    }));
+  const [errors, setErrors] = useState({});
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const updateValue = (field, value) => {
+    if (field === "currentPassword") {
+      setCurrentPassword(value);
+    }
+
+    if (field === "newPassword") {
+      setNewPassword(value);
+    }
+
+    if (field === "confirmPassword") {
+      setConfirmPassword(value);
+    }
 
     if (errors[field]) {
       setErrors((previousErrors) => ({
@@ -55,46 +61,66 @@ export default function ChangePasswordScreen({ navigation }) {
     }
   };
 
-  const handleSubmit = async () => {
-    if (submitting) {
+  const validateForm = () => {
+    const nextErrors = {};
+
+    if (!currentPassword) {
+      nextErrors.currentPassword = "Vui lòng nhập mật khẩu hiện tại";
+    }
+
+    if (!newPassword) {
+      nextErrors.newPassword = "Vui lòng nhập mật khẩu mới";
+    } else if (newPassword.length < 6) {
+      nextErrors.newPassword = "Mật khẩu mới phải có ít nhất 6 ký tự";
+    } else if (newPassword === currentPassword) {
+      nextErrors.newPassword = "Mật khẩu mới phải khác mật khẩu hiện tại";
+    }
+
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = "Vui lòng xác nhận mật khẩu mới";
+    } else if (confirmPassword !== newPassword) {
+      nextErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
+    }
+
+    setErrors(nextErrors);
+
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleChangePassword = async () => {
+    if (!validateForm() || submitting) {
       return;
     }
 
     try {
       setSubmitting(true);
-      setErrors({});
 
-      const result = await changePassword(formData);
+      const result = await changePassword(currentPassword, newPassword);
 
-      if (!result.success) {
-        if (result.errors) {
-          setErrors(result.errors);
-        }
-
-        Alert.alert("Đổi mật khẩu thất bại", result.message);
+      if (!result?.success) {
+        Alert.alert(
+          "Đổi mật khẩu thất bại",
+          result?.message || "Không thể đổi mật khẩu.",
+        );
 
         return;
       }
 
-      setFormData(initialFormData);
-
       Alert.alert(
         "Đổi mật khẩu thành công",
-        "Mật khẩu của bạn đã được cập nhật.",
+        "Mật khẩu tài khoản đã được cập nhật.",
         [
           {
-            text: "OK",
+            text: "Hoàn tất",
+
             onPress: () => navigation.goBack(),
           },
         ],
-        {
-          cancelable: false,
-        },
       );
     } catch (error) {
-      console.error("Lỗi khi đổi mật khẩu:", error);
+      console.error("Lỗi đổi mật khẩu:", error);
 
-      Alert.alert("Có lỗi xảy ra", "Không thể đổi mật khẩu. Vui lòng thử lại.");
+      Alert.alert("Có lỗi xảy ra", "Không thể đổi mật khẩu vào lúc này.");
     } finally {
       setSubmitting(false);
     }
@@ -103,7 +129,7 @@ export default function ChangePasswordScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
-        style={styles.keyboardContainer}
+        style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.header}>
@@ -112,15 +138,13 @@ export default function ChangePasswordScreen({ navigation }) {
             onPress={() => navigation.goBack()}
           />
 
-          <View style={styles.headerText}>
+          <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>Đổi mật khẩu</Text>
 
-            <Text style={styles.headerSubtitle}>
-              Cập nhật mật khẩu tài khoản
-            </Text>
+            <Text style={styles.headerSubtitle}>Bảo mật tài khoản</Text>
           </View>
 
-          <View style={styles.headerSpacer} />
+          <View style={styles.headerRight} />
         </View>
 
         <ScrollView
@@ -132,72 +156,67 @@ export default function ChangePasswordScreen({ navigation }) {
             <View style={styles.securityIcon}>
               <Ionicons
                 name="shield-checkmark-outline"
-                size={36}
-                color="#7A8450"
+                size={31}
+                color="#D96A87"
               />
             </View>
 
-            <Text style={styles.securityTitle}>Bảo mật tài khoản</Text>
+            <Text style={styles.securityTitle}>Bảo vệ tài khoản của bạn</Text>
 
             <Text style={styles.securityDescription}>
-              Nhập mật khẩu hiện tại trước khi tạo mật khẩu mới.
+              Sử dụng mật khẩu có ít nhất 6 ký tự và không chia sẻ mật khẩu cho
+              người khác.
             </Text>
           </View>
 
-          <Text style={styles.sectionLabel}>THÔNG TIN MẬT KHẨU</Text>
+          <Text style={styles.label}>MẬT KHẨU HIỆN TẠI</Text>
 
-          <View style={styles.formCard}>
-            <PasswordField
-              label="Mật khẩu hiện tại"
-              value={formData.currentPassword}
-              placeholder="Nhập mật khẩu hiện tại"
-              error={errors.currentPassword}
-              visible={showCurrentPassword}
-              onToggleVisible={() =>
-                setShowCurrentPassword((previousValue) => !previousValue)
-              }
-              onChangeText={(value) => updateField("currentPassword", value)}
-            />
+          <PasswordInput
+            value={currentPassword}
+            onChangeText={(value) => updateValue("currentPassword", value)}
+            placeholder="Nhập mật khẩu hiện tại"
+            visible={showCurrentPassword}
+            onToggle={() =>
+              setShowCurrentPassword((previousValue) => !previousValue)
+            }
+            error={errors.currentPassword}
+          />
 
-            <PasswordField
-              label="Mật khẩu mới"
-              value={formData.newPassword}
-              placeholder="Tối thiểu 6 ký tự"
-              error={errors.newPassword}
-              visible={showNewPassword}
-              onToggleVisible={() =>
-                setShowNewPassword((previousValue) => !previousValue)
-              }
-              onChangeText={(value) => updateField("newPassword", value)}
-            />
+          <Text style={styles.label}>MẬT KHẨU MỚI</Text>
 
-            <PasswordField
-              label="Xác nhận mật khẩu mới"
-              value={formData.confirmPassword}
-              placeholder="Nhập lại mật khẩu mới"
-              error={errors.confirmPassword}
-              visible={showConfirmPassword}
-              showBorder={false}
-              onToggleVisible={() =>
-                setShowConfirmPassword((previousValue) => !previousValue)
-              }
-              onChangeText={(value) => updateField("confirmPassword", value)}
-            />
-          </View>
+          <PasswordInput
+            value={newPassword}
+            onChangeText={(value) => updateValue("newPassword", value)}
+            placeholder="Nhập mật khẩu mới"
+            visible={showNewPassword}
+            onToggle={() =>
+              setShowNewPassword((previousValue) => !previousValue)
+            }
+            error={errors.newPassword}
+          />
 
-          <View style={styles.noticeCard}>
-            <Ionicons
-              name="information-circle-outline"
-              size={22}
-              color="#7A8450"
-            />
+          <Text style={styles.label}>XÁC NHẬN MẬT KHẨU MỚI</Text>
 
-            <View style={styles.noticeContent}>
-              <Text style={styles.noticeTitle}>Lưu ý</Text>
+          <PasswordInput
+            value={confirmPassword}
+            onChangeText={(value) => updateValue("confirmPassword", value)}
+            placeholder="Nhập lại mật khẩu mới"
+            visible={showConfirmPassword}
+            onToggle={() =>
+              setShowConfirmPassword((previousValue) => !previousValue)
+            }
+            error={errors.confirmPassword}
+          />
 
-              <Text style={styles.noticeText}>
-                Mật khẩu mới phải có ít nhất 6 ký tự và phải khác mật khẩu hiện
-                tại.
+          <View style={styles.tipCard}>
+            <Ionicons name="bulb-outline" size={21} color="#D96A87" />
+
+            <View style={styles.tipContent}>
+              <Text style={styles.tipTitle}>Gợi ý mật khẩu</Text>
+
+              <Text style={styles.tipDescription}>
+                Nên kết hợp chữ hoa, chữ thường, số và ký tự đặc biệt để tăng độ
+                an toàn.
               </Text>
             </View>
           </View>
@@ -206,15 +225,15 @@ export default function ChangePasswordScreen({ navigation }) {
             activeOpacity={0.85}
             disabled={submitting}
             style={[styles.submitButton, submitting && styles.disabledButton]}
-            onPress={handleSubmit}
+            onPress={handleChangePassword}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator color="#FFFFFF" />
             ) : (
               <>
                 <Ionicons name="key-outline" size={21} color="#FFFFFF" />
 
-                <Text style={styles.submitButtonText}>ĐỔI MẬT KHẨU</Text>
+                <Text style={styles.submitText}>CẬP NHẬT MẬT KHẨU</Text>
               </>
             )}
           </TouchableOpacity>
@@ -224,64 +243,55 @@ export default function ChangePasswordScreen({ navigation }) {
   );
 }
 
-function PasswordField({
-  label,
+function PasswordInput({
   value,
-  placeholder,
-  error,
-  visible,
-  onToggleVisible,
   onChangeText,
-  showBorder = true,
+  placeholder,
+  visible,
+  onToggle,
+  error,
 }) {
   return (
-    <View
-      style={[styles.fieldContainer, showBorder && styles.fieldContainerBorder]}
-    >
-      <Text style={styles.fieldLabel}>{label}</Text>
-
-      <View
-        style={[styles.inputContainer, error && styles.inputContainerError]}
-      >
-        <Ionicons name="lock-closed-outline" size={20} color="#7A8450" />
+    <>
+      <View style={[styles.inputContainer, error && styles.errorBorder]}>
+        <Ionicons name="lock-closed-outline" size={20} color="#AAA392" />
 
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#AAA797"
+          placeholderTextColor="#AAA392"
           secureTextEntry={!visible}
           autoCapitalize="none"
           autoCorrect={false}
-          textContentType="password"
           style={styles.input}
         />
 
         <TouchableOpacity
           activeOpacity={0.7}
-          style={styles.eyeButton}
-          onPress={onToggleVisible}
+          style={styles.passwordButton}
+          onPress={onToggle}
         >
           <Ionicons
             name={visible ? "eye-off-outline" : "eye-outline"}
-            size={21}
-            color="#A1A18E"
+            size={20}
+            color="#AAA392"
           />
         </TouchableOpacity>
       </View>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FDFCF8",
+    backgroundColor: "#FFFFFF",
   },
 
-  keyboardContainer: {
+  keyboardView: {
     flex: 1,
   },
 
@@ -297,193 +307,165 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
 
     borderBottomWidth: 1,
-    borderBottomColor: "#E8E4D9",
+    borderBottomColor: "#F0ECE5",
   },
 
-  headerText: {
+  headerTextContainer: {
     flex: 1,
     alignItems: "center",
   },
 
   headerTitle: {
-    color: "#4A4A3A",
+    color: "#28231F",
     fontSize: 17,
     fontWeight: "800",
   },
 
   headerSubtitle: {
-    color: "#A1A18E",
+    color: "#AAA392",
     fontSize: 10,
+
     marginTop: 2,
   },
 
-  headerSpacer: {
+  headerRight: {
     width: 42,
     height: 42,
   },
 
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 35,
   },
 
   securityCard: {
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFF7F9",
 
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingHorizontal: 22,
+    paddingVertical: 25,
 
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
     borderRadius: 24,
 
-    elevation: 2,
+    marginBottom: 4,
   },
 
   securityIcon: {
-    width: 78,
-    height: 78,
-    borderRadius: 25,
+    width: 72,
+    height: 72,
+    borderRadius: 24,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: "#FFFFFF",
   },
 
   securityTitle: {
-    color: "#4A4A3A",
-    fontSize: 19,
+    color: "#28231F",
+    fontSize: 17,
     fontWeight: "800",
 
     marginTop: 14,
   },
 
   securityDescription: {
-    color: "#8A8A75",
-    fontSize: 12,
-    lineHeight: 19,
+    maxWidth: 290,
+
+    color: "#81786D",
+    fontSize: 11,
+    lineHeight: 18,
 
     textAlign: "center",
 
-    marginTop: 5,
+    marginTop: 6,
   },
 
-  sectionLabel: {
-    color: "#A1A18E",
+  label: {
+    color: "#AAA392",
     fontSize: 10,
     fontWeight: "800",
-
     letterSpacing: 0.8,
 
-    marginTop: 23,
-    marginLeft: 5,
-    marginBottom: 8,
-  },
-
-  formCard: {
-    backgroundColor: "#FFFFFF",
-
-    paddingHorizontal: 15,
-
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 22,
-
-    elevation: 2,
-  },
-
-  fieldContainer: {
-    paddingVertical: 15,
-  },
-
-  fieldContainerBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#E8E4D9",
-  },
-
-  fieldLabel: {
-    color: "#6D6D5D",
-    fontSize: 11,
-    fontWeight: "700",
-
+    marginTop: 19,
     marginBottom: 8,
   },
 
   inputContainer: {
-    height: 52,
+    height: 53,
 
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#F9F8F3",
+    backgroundColor: "#FFFFFF",
+
+    paddingLeft: 14,
+    paddingRight: 8,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 15,
-
-    paddingLeft: 13,
-  },
-
-  inputContainerError: {
-    borderColor: "#C75C5C",
-    backgroundColor: "#FFF9F9",
+    borderColor: "#F0ECE5",
+    borderRadius: 16,
   },
 
   input: {
     flex: 1,
-    height: 50,
+    height: 51,
 
-    color: "#4A4A3A",
-    fontSize: 13,
-    fontWeight: "600",
+    color: "#4A443D",
+    fontSize: 14,
 
     paddingHorizontal: 10,
+    paddingVertical: 0,
   },
 
-  eyeButton: {
-    width: 46,
-    height: 50,
+  passwordButton: {
+    width: 36,
+    height: 36,
 
     alignItems: "center",
     justifyContent: "center",
   },
 
-  errorText: {
-    color: "#C75C5C",
-    fontSize: 10,
-    fontWeight: "600",
-
-    marginTop: 6,
+  errorBorder: {
+    borderColor: "#C94F68",
   },
 
-  noticeCard: {
-    flexDirection: "row",
+  errorText: {
+    color: "#C94F68",
+    fontSize: 11,
+    fontWeight: "600",
 
-    backgroundColor: "#F3F1E9",
+    marginTop: 5,
+  },
+
+  tipCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+
+    backgroundColor: "#FFF7F9",
 
     padding: 14,
 
     borderRadius: 17,
-    marginTop: 17,
+
+    marginTop: 22,
   },
 
-  noticeContent: {
+  tipContent: {
     flex: 1,
     marginLeft: 10,
   },
 
-  noticeTitle: {
-    color: "#4A4A3A",
+  tipTitle: {
+    color: "#4A443D",
     fontSize: 12,
     fontWeight: "800",
   },
 
-  noticeText: {
-    color: "#8A8A75",
+  tipDescription: {
+    color: "#81786D",
     fontSize: 10,
     lineHeight: 16,
 
@@ -491,21 +473,20 @@ const styles = StyleSheet.create({
   },
 
   submitButton: {
-    height: 54,
+    height: 55,
 
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#7A8450",
+    backgroundColor: "#A86D3D",
 
     borderRadius: 17,
-    marginTop: 24,
 
-    elevation: 3,
+    marginTop: 25,
   },
 
-  submitButtonText: {
+  submitText: {
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "800",
@@ -514,6 +495,6 @@ const styles = StyleSheet.create({
   },
 
   disabledButton: {
-    opacity: 0.6,
+    opacity: 0.65,
   },
 });

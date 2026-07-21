@@ -1,4 +1,6 @@
+import { COLORS } from "../constants/colors";
 import React, { useCallback, useMemo, useState } from "react";
+
 import {
   ActivityIndicator,
   FlatList,
@@ -9,40 +11,48 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+
 import BackButton from "../components/BackButton";
+
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../utils/categories";
+
 import { formatPrice, formatTimeAgo, getUserItems } from "../utils/itemUtils";
 
 const filters = [
   {
     id: "all",
-    name: "Tất cả",
+    label: "Tất cả",
   },
   {
     id: "selling",
-    name: "Đang bán",
+    label: "Đang bán",
   },
   {
     id: "sold",
-    name: "Đã bán",
+    label: "Đã bán",
   },
 ];
 
 export default function ManageListingsScreen({ navigation }) {
   const { user } = useAuth();
+
   const [items, setItems] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
+
   const [loading, setLoading] = useState(true);
+
   const [refreshing, setRefreshing] = useState(false);
+
   const loadItems = useCallback(async () => {
     try {
       const userItems = await getUserItems(user);
 
-      setItems(userItems);
+      setItems(Array.isArray(userItems) ? userItems : []);
     } catch (error) {
       console.error("Lỗi khi tải tin đăng:", error);
 
@@ -67,13 +77,15 @@ export default function ManageListingsScreen({ navigation }) {
     return items.filter((item) => item.status === activeFilter);
   }, [items, activeFilter]);
 
-  const sellingCount = useMemo(() => {
-    return items.filter((item) => item.status === "selling").length;
-  }, [items]);
+  const sellingCount = useMemo(
+    () => items.filter((item) => item.status === "selling").length,
+    [items],
+  );
 
-  const soldCount = useMemo(() => {
-    return items.filter((item) => item.status === "sold").length;
-  }, [items]);
+  const soldCount = useMemo(
+    () => items.filter((item) => item.status === "sold").length,
+    [items],
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -81,15 +93,19 @@ export default function ManageListingsScreen({ navigation }) {
   };
 
   const getCategoryName = (categoryId) => {
-    const category = categories.find(
-      (currentCategory) => currentCategory.id === categoryId,
+    return (
+      categories.find((category) => category.id === categoryId)?.name || "Khác"
     );
+  };
 
-    return category?.name || "Khác";
+  const openAddScreen = () => {
+    navigation.navigate("MainTabs", {
+      screen: "Add",
+    });
   };
 
   const renderItem = ({ item }) => {
-    const isSold = item.status === "sold";
+    const sold = item.status === "sold";
 
     return (
       <TouchableOpacity
@@ -112,119 +128,51 @@ export default function ManageListingsScreen({ navigation }) {
             />
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Ionicons name="image-outline" size={38} color="#A1A18E" />
+              <Ionicons
+                name="image-outline"
+                size={35}
+                color={COLORS.textMuted}
+              />
             </View>
           )}
 
           <View
             style={[
               styles.statusBadge,
-              isSold ? styles.soldStatusBadge : styles.sellingStatusBadge,
+
+              sold ? styles.soldBadge : styles.sellingBadge,
             ]}
           >
-            <Text
-              style={[
-                styles.statusBadgeText,
-                isSold ? styles.soldStatusText : styles.sellingStatusText,
-              ]}
-            >
-              {isSold ? "ĐÃ BÁN" : "ĐANG BÁN"}
+            <Text style={styles.statusText}>
+              {sold ? "ĐÃ BÁN" : "ĐANG BÁN"}
             </Text>
           </View>
         </View>
 
         <View style={styles.productContent}>
-          <View style={styles.categoryRow}>
-            <Text style={styles.categoryText}>
-              {getCategoryName(item.category)}
-            </Text>
+          <Text style={styles.categoryText}>
+            {getCategoryName(item.category)}
+          </Text>
 
-            <Text style={styles.conditionText}>
-              {item.condition || "Chưa rõ"}
-            </Text>
-          </View>
-
-          <Text
-            numberOfLines={2}
-            ellipsizeMode="tail"
-            style={styles.productTitle}
-          >
+          <Text numberOfLines={2} style={styles.productTitle}>
             {item.title}
           </Text>
 
           <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
 
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={14} color="#A1A18E" />
+          <View style={styles.metaRow}>
+            <Ionicons name="time-outline" size={13} color={COLORS.textMuted} />
 
-            <Text numberOfLines={1} style={styles.infoText}>
-              {item.location || "Chưa cập nhật địa điểm"}
-            </Text>
+            <Text style={styles.timeText}>{formatTimeAgo(item.createdAt)}</Text>
           </View>
 
-          <View style={styles.bottomRow}>
-            <View style={styles.timeRow}>
-              <Ionicons name="time-outline" size={14} color="#A1A18E" />
+          <View style={styles.cardFooter}>
+            <Text style={styles.viewDetailText}>Xem chi tiết</Text>
 
-              <Text style={styles.timeText}>
-                {formatTimeAgo(item.createdAt)}
-              </Text>
-            </View>
-
-            <View style={styles.detailButton}>
-              <Text style={styles.detailButtonText}>Xem chi tiết</Text>
-
-              <Ionicons name="chevron-forward" size={16} color="#7A8450" />
-            </View>
+            <Ionicons name="arrow-forward" size={16} color={COLORS.primary} />
           </View>
         </View>
       </TouchableOpacity>
-    );
-  };
-
-  const renderEmpty = () => {
-    let title = "Bạn chưa có tin đăng nào";
-
-    let description = "Hãy đăng sản phẩm đầu tiên của bạn.";
-
-    if (activeFilter === "selling") {
-      title = "Không có sản phẩm đang bán";
-
-      description = "Các sản phẩm đang bán sẽ xuất hiện tại đây.";
-    }
-
-    if (activeFilter === "sold") {
-      title = "Không có sản phẩm đã bán";
-
-      description = "Các sản phẩm được đánh dấu đã bán sẽ xuất hiện tại đây.";
-    }
-
-    return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIcon}>
-          <Ionicons name="cube-outline" size={45} color="#A1A18E" />
-        </View>
-
-        <Text style={styles.emptyTitle}>{title}</Text>
-
-        <Text style={styles.emptyDescription}>{description}</Text>
-
-        {items.length === 0 ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={styles.addButton}
-            onPress={() =>
-              navigation.navigate("MainTabs", {
-                screen: "Add",
-              })
-            }
-          >
-            <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
-
-            <Text style={styles.addButtonText}>ĐĂNG SẢN PHẨM</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
     );
   };
 
@@ -233,88 +181,49 @@ export default function ManageListingsScreen({ navigation }) {
       <View style={styles.header}>
         <BackButton onPress={() => navigation.goBack()} />
 
-        <View style={styles.headerText}>
+        <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>Quản lý tin đăng</Text>
 
-          <Text style={styles.headerSubtitle}>Sản phẩm bạn đã đăng bán</Text>
+          <Text style={styles.headerSubtitle}>Sản phẩm của bạn</Text>
         </View>
 
         <TouchableOpacity
           activeOpacity={0.75}
-          style={styles.headerActionButton}
-          onPress={handleRefresh}
+          style={styles.addButton}
+          onPress={openAddScreen}
         >
-          <Ionicons name="refresh-outline" size={23} color="#7A8450" />
+          <Ionicons name="add" size={25} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.summaryContainer}>
-        <SummaryItem
-          iconName="cube-outline"
-          value={items.length}
-          label="Tổng tin đăng"
-        />
+      <View style={styles.summaryCard}>
+        <SummaryItem value={items.length} label="Tổng tin đăng" />
 
         <View style={styles.summaryDivider} />
 
-        <SummaryItem
-          iconName="pricetag-outline"
-          value={sellingCount}
-          label="Đang bán"
-        />
+        <SummaryItem value={sellingCount} label="Đang bán" />
 
         <View style={styles.summaryDivider} />
 
-        <SummaryItem
-          iconName="checkmark-circle-outline"
-          value={soldCount}
-          label="Đã bán"
-          iconColor="#8B5E3C"
-        />
+        <SummaryItem value={soldCount} label="Đã bán" />
       </View>
 
-      <View style={styles.filterSection}>
+      <View style={styles.filterRow}>
         {filters.map((filter) => {
-          const isActive = activeFilter === filter.id;
-
-          const count =
-            filter.id === "all"
-              ? items.length
-              : filter.id === "selling"
-                ? sellingCount
-                : soldCount;
+          const active = activeFilter === filter.id;
 
           return (
             <TouchableOpacity
               key={filter.id}
               activeOpacity={0.8}
-              style={[
-                styles.filterButton,
-                isActive && styles.activeFilterButton,
-              ]}
+              style={[styles.filterButton, active && styles.activeFilterButton]}
               onPress={() => setActiveFilter(filter.id)}
             >
               <Text
-                style={[styles.filterText, isActive && styles.activeFilterText]}
+                style={[styles.filterText, active && styles.activeFilterText]}
               >
-                {filter.name}
+                {filter.label}
               </Text>
-
-              <View
-                style={[
-                  styles.filterCount,
-                  isActive && styles.activeFilterCount,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterCountText,
-                    isActive && styles.activeFilterCountText,
-                  ]}
-                >
-                  {count}
-                </Text>
-              </View>
             </TouchableOpacity>
           );
         })}
@@ -322,7 +231,7 @@ export default function ManageListingsScreen({ navigation }) {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#7A8450" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
 
           <Text style={styles.loadingText}>Đang tải tin đăng...</Text>
         </View>
@@ -332,15 +241,21 @@ export default function ManageListingsScreen({ navigation }) {
           keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={[
+            styles.listContent,
+
+            filteredItems.length === 0 && styles.emptyListContent,
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#7A8450"
-              colors={["#7A8450"]}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
             />
+          }
+          ListEmptyComponent={
+            <EmptyState activeFilter={activeFilter} onAdd={openAddScreen} />
           }
         />
       )}
@@ -348,18 +263,43 @@ export default function ManageListingsScreen({ navigation }) {
   );
 }
 
-function SummaryItem({ iconName, value, label, iconColor = "#7A8450" }) {
+function SummaryItem({ value, label }) {
   return (
-    <View style={styles.summaryCard}>
-      <View style={styles.summaryIconContainer}>
-        <Ionicons name={iconName} size={21} color={iconColor} />
+    <View style={styles.summaryItem}>
+      <Text style={styles.summaryValue}>{value}</Text>
+
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function EmptyState({ activeFilter, onAdd }) {
+  const message =
+    activeFilter === "selling"
+      ? "Bạn chưa có sản phẩm đang bán."
+      : activeFilter === "sold"
+        ? "Bạn chưa có sản phẩm đã bán."
+        : "Bạn chưa đăng sản phẩm nào.";
+
+  return (
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIcon}>
+        <Ionicons name="cube-outline" size={45} color={COLORS.textMuted} />
       </View>
 
-      <View>
-        <Text style={styles.summaryValue}>{value}</Text>
+      <Text style={styles.emptyTitle}>Chưa có tin đăng</Text>
 
-        <Text style={styles.summaryLabel}>{label}</Text>
-      </View>
+      <Text style={styles.emptyDescription}>{message}</Text>
+
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.emptyButton}
+        onPress={onAdd}
+      >
+        <Ionicons name="add" size={20} color={COLORS.white} />
+
+        <Text style={styles.emptyButtonText}>ĐĂNG SẢN PHẨM</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -367,7 +307,7 @@ function SummaryItem({ iconName, value, label, iconColor = "#7A8450" }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FDFCF8",
+    backgroundColor: COLORS.background,
   },
 
   header: {
@@ -376,16 +316,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 14,
     paddingVertical: 10,
 
     borderBottomWidth: 1,
-    borderBottomColor: "#E8E4D9",
+    borderBottomColor: COLORS.border,
   },
 
-  headerActionButton: {
+  headerTextContainer: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  headerTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: "800",
+  },
+
+  headerSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+
+    marginTop: 2,
+  },
+
+  addButton: {
     width: 42,
     height: 42,
     borderRadius: 14,
@@ -393,153 +351,89 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
-  },
-
-  headerText: {
-    flex: 1,
-    alignItems: "center",
-  },
-
-  headerTitle: {
-    color: "#4A4A3A",
-    fontSize: 17,
-    fontWeight: "800",
-  },
-
-  headerSubtitle: {
-    color: "#A1A18E",
-    fontSize: 10,
-    marginTop: 2,
-  },
-
-  summaryContainer: {
-    minHeight: 90,
-
-    flexDirection: "row",
-    alignItems: "center",
-
-    backgroundColor: "#FFFFFF",
-
-    marginHorizontal: 16,
-    marginTop: 16,
-
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 20,
-
-    elevation: 2,
+    backgroundColor: COLORS.primaryLight,
   },
 
   summaryCard: {
-    flex: 1,
+    minHeight: 82,
 
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+
+    backgroundColor: COLORS.primarySoft,
+
+    marginHorizontal: 16,
+    marginTop: 15,
+
+    borderRadius: 21,
   },
 
-  summaryIconContainer: {
-    width: 37,
-    height: 37,
-    borderRadius: 12,
-
+  summaryItem: {
+    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-
-    backgroundColor: "#F3F1E9",
-
-    marginRight: 8,
   },
 
   summaryValue: {
-    color: "#4A4A3A",
-    fontSize: 18,
+    color: COLORS.text,
+    fontSize: 20,
     fontWeight: "800",
   },
 
   summaryLabel: {
-    color: "#A1A18E",
-    fontSize: 8,
+    color: COLORS.textMuted,
+    fontSize: 9,
     fontWeight: "700",
-    marginTop: 1,
+
+    marginTop: 3,
   },
 
   summaryDivider: {
     width: 1,
-    height: 44,
+    height: 34,
 
-    backgroundColor: "#E8E4D9",
+    backgroundColor: COLORS.border,
   },
 
-  filterSection: {
+  filterRow: {
     flexDirection: "row",
 
     paddingHorizontal: 16,
-    paddingVertical: 15,
+    paddingTop: 15,
+    paddingBottom: 8,
   },
 
   filterButton: {
-    flex: 1,
-    height: 42,
+    height: 38,
 
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.card,
+
+    paddingHorizontal: 17,
 
     borderWidth: 1,
-    borderColor: "transparent",
+    borderColor: COLORS.border,
     borderRadius: 14,
 
-    marginHorizontal: 4,
+    marginRight: 8,
   },
 
   activeFilterButton: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#7A8450",
+    backgroundColor: COLORS.primary,
 
-    elevation: 2,
+    borderColor: COLORS.primary,
   },
 
   filterText: {
-    color: "#8A8A75",
+    color: COLORS.textSecondary,
+
     fontSize: 11,
     fontWeight: "700",
   },
 
   activeFilterText: {
-    color: "#7A8450",
-    fontWeight: "800",
-  },
-
-  filterCount: {
-    minWidth: 21,
-    height: 21,
-    borderRadius: 11,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    backgroundColor: "#E8E4D9",
-
-    marginLeft: 6,
-    paddingHorizontal: 5,
-  },
-
-  activeFilterCount: {
-    backgroundColor: "#7A8450",
-  },
-
-  filterCountText: {
-    color: "#8A8A75",
-    fontSize: 9,
-    fontWeight: "800",
-  },
-
-  activeFilterCountText: {
-    color: "#FFFFFF",
+    color: COLORS.white,
   },
 
   loadingContainer: {
@@ -550,32 +444,35 @@ const styles = StyleSheet.create({
   },
 
   loadingText: {
-    color: "#8A8A75",
+    color: COLORS.textSecondary,
+
     fontSize: 13,
 
     marginTop: 12,
   },
 
   listContent: {
-    flexGrow: 1,
-
     paddingHorizontal: 16,
+    paddingTop: 6,
     paddingBottom: 30,
+  },
+
+  emptyListContent: {
+    flexGrow: 1,
   },
 
   productCard: {
     flexDirection: "row",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
-    padding: 11,
-    marginBottom: 13,
+    padding: 10,
+
+    marginBottom: 12,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
+    borderColor: COLORS.border,
     borderRadius: 20,
-
-    elevation: 2,
   },
 
   imageContainer: {
@@ -584,12 +481,11 @@ const styles = StyleSheet.create({
 
     position: "relative",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.imagePlaceholder,
 
     borderRadius: 16,
-    overflow: "hidden",
 
-    marginRight: 13,
+    overflow: "hidden",
   },
 
   productImage: {
@@ -609,154 +505,116 @@ const styles = StyleSheet.create({
     left: 7,
     bottom: 7,
 
-    paddingHorizontal: 7,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
 
-    borderRadius: 8,
+    borderRadius: 9,
   },
 
-  sellingStatusBadge: {
-    backgroundColor: "rgba(255,255,255,0.94)",
+  sellingBadge: {
+    backgroundColor: COLORS.primary,
   },
 
-  soldStatusBadge: {
-    backgroundColor: "rgba(139,94,60,0.94)",
+  soldBadge: {
+    backgroundColor: COLORS.primaryDark,
   },
 
-  statusBadgeText: {
-    fontSize: 8,
+  statusText: {
+    color: COLORS.white,
+    fontSize: 7,
     fontWeight: "800",
-  },
-
-  sellingStatusText: {
-    color: "#7A8450",
-  },
-
-  soldStatusText: {
-    color: "#FFFFFF",
   },
 
   productContent: {
     flex: 1,
-  },
 
-  categoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    paddingLeft: 12,
+    paddingVertical: 3,
   },
 
   categoryText: {
-    color: "#A1A18E",
-    fontSize: 9,
+    color: COLORS.primary,
+    fontSize: 8,
     fontWeight: "800",
     textTransform: "uppercase",
   },
 
-  conditionText: {
-    color: "#7A8450",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
   productTitle: {
-    color: "#4A4A3A",
-    fontSize: 15,
-    lineHeight: 20,
+    color: COLORS.text,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: "800",
 
-    marginTop: 5,
+    marginTop: 4,
   },
 
   priceText: {
-    color: "#7A8450",
+    color: COLORS.primaryDark,
     fontSize: 15,
     fontWeight: "800",
 
-    marginTop: 5,
+    marginTop: 6,
   },
 
-  infoRow: {
+  metaRow: {
     flexDirection: "row",
     alignItems: "center",
 
     marginTop: 7,
   },
 
-  infoText: {
-    flex: 1,
-
-    color: "#8A8A75",
+  timeText: {
+    color: COLORS.textMuted,
     fontSize: 9,
 
     marginLeft: 4,
   },
 
-  bottomRow: {
+  cardFooter: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
 
     marginTop: "auto",
-    paddingTop: 8,
-
-    borderTopWidth: 1,
-    borderTopColor: "#F3F1E9",
   },
 
-  timeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  timeText: {
-    color: "#A1A18E",
-    fontSize: 9,
-
-    marginLeft: 4,
-  },
-
-  detailButton: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  detailButtonText: {
-    color: "#7A8450",
+  viewDetailText: {
+    color: COLORS.primary,
     fontSize: 9,
     fontWeight: "800",
+
+    marginRight: 4,
   },
 
   emptyContainer: {
-    minHeight: 380,
+    flex: 1,
 
     alignItems: "center",
     justifyContent: "center",
 
-    paddingHorizontal: 30,
+    paddingHorizontal: 35,
   },
 
   emptyIcon: {
-    width: 82,
-    height: 82,
-    borderRadius: 27,
+    width: 84,
+    height: 84,
+    borderRadius: 25,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.primaryLight,
   },
 
   emptyTitle: {
-    color: "#4A4A3A",
+    color: COLORS.text,
     fontSize: 17,
     fontWeight: "800",
 
-    marginTop: 17,
+    marginTop: 16,
   },
 
   emptyDescription: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 12,
     lineHeight: 19,
 
@@ -765,26 +623,27 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  addButton: {
-    height: 48,
+  emptyButton: {
+    height: 47,
 
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#7A8450",
+    backgroundColor: COLORS.primary,
 
-    paddingHorizontal: 20,
+    paddingHorizontal: 19,
 
-    borderRadius: 15,
-    marginTop: 18,
+    borderRadius: 16,
+
+    marginTop: 19,
   },
 
-  addButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
+  emptyButtonText: {
+    color: COLORS.white,
+    fontSize: 11,
     fontWeight: "800",
 
-    marginLeft: 7,
+    marginLeft: 6,
   },
 });

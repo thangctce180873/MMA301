@@ -1,32 +1,38 @@
+import { COLORS } from "../constants/colors";
 import React from "react";
 
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import { useAuth } from "../context/AuthContext";
+
 import MainTabs from "./MainTabs";
 
-import ChangePasswordScreen from "../screens/ChangePasswordScreen";
-import DetailScreen from "../screens/DetailScreen";
 import LoginScreen from "../screens/LoginScreen";
+import RegisterScreen from "../screens/RegisterScreen";
+import DetailScreen from "../screens/DetailScreen";
+import MessagesScreen from "../screens/MessagesScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
+import PersonalInfoScreen from "../screens/PersonalInfoScreen";
+import ChangePasswordScreen from "../screens/ChangePasswordScreen";
 import ManageFavoritesScreen from "../screens/ManageFavoritesScreen";
 import ManageListingsScreen from "../screens/ManageListingsScreen";
-import PersonalInfoScreen from "../screens/PersonalInfoScreen";
-import RegisterScreen from "../screens/RegisterScreen";
-
-import { useAuth } from "../context/AuthContext";
+import SettingsScreen from "../screens/SettingsScreen";
 
 const Stack = createNativeStackNavigator();
 
 export default function RootStack() {
-  const { loading, isAuthenticated } = useAuth();
+  const auth = useAuth();
 
-  if (loading) {
+  const user = auth?.user;
+
+  const authLoading = auth?.loading ?? auth?.initializing ?? false;
+
+  if (authLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7A8450" />
-
-        <Text style={styles.loadingText}>Đang khởi động ứng dụng...</Text>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
@@ -37,25 +43,19 @@ export default function RootStack() {
         headerShown: false,
         animation: "slide_from_right",
         contentStyle: {
-          backgroundColor: "#FDFCF8",
+          backgroundColor: COLORS.background,
         },
       }}
     >
-      {isAuthenticated ? (
+      {user ? (
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} />
 
           <Stack.Screen name="Detail" component={DetailScreen} />
 
-          <Stack.Screen
-            name="ManageListings"
-            component={ManageListingsScreen}
-          />
+          <Stack.Screen name="Messages" component={MessagesScreen} />
 
-          <Stack.Screen
-            name="ManageFavorites"
-            component={ManageFavoritesScreen}
-          />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
 
           <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
 
@@ -63,6 +63,18 @@ export default function RootStack() {
             name="ChangePassword"
             component={ChangePasswordScreen}
           />
+
+          <Stack.Screen
+            name="ManageFavorites"
+            component={ManageFavoritesScreen}
+          />
+
+          <Stack.Screen
+            name="ManageListings"
+            component={ManageListingsScreen}
+          />
+
+          <Stack.Screen name="Settings" component={SettingsScreen} />
         </>
       ) : (
         <>
@@ -82,13 +94,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#FDFCF8",
-  },
-
-  loadingText: {
-    color: "#8A8A75",
-    fontSize: 13,
-
-    marginTop: 12,
+    backgroundColor: COLORS.background,
   },
 });

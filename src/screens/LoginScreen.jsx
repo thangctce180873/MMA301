@@ -1,7 +1,11 @@
+import { COLORS } from "../constants/colors";
 import React, { useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,53 +15,96 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+
 import { useAuth } from "../context/AuthContext";
 
-const initialFormData = {
-  email: "",
-  password: "",
-};
+const APP_LOGO = require("../assets/logo.png");
+const LOGIN_BACKGROUND = require("../assets/banner.png");
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
-  const [formData, setFormData] = useState(initialFormData);
-  const [errors, setErrors] = useState({});
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const updateField = (field, value) => {
-    setFormData((previousData) => ({
-      ...previousData,
-      [field]: value,
-    }));
 
-    if (errors[field]) {
+  const [email, setEmail] = useState("");
+
+  const [password, setPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [errors, setErrors] = useState({});
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const validateForm = () => {
+    const nextErrors = {};
+
+    const normalizedEmail = String(email || "")
+      .trim()
+      .toLowerCase();
+
+    if (!normalizedEmail) {
+      nextErrors.email = "Vui lòng nhập email";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = "Email không đúng định dạng";
+    }
+
+    if (!password) {
+      nextErrors.password = "Vui lòng nhập mật khẩu";
+    }
+
+    setErrors(nextErrors);
+
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleEmailChange = (value) => {
+    setEmail(value);
+
+    if (errors.email) {
       setErrors((previousErrors) => ({
         ...previousErrors,
-        [field]: null,
+        email: null,
+      }));
+    }
+  };
+
+  const handlePasswordChange = (value) => {
+    setPassword(value);
+
+    if (errors.password) {
+      setErrors((previousErrors) => ({
+        ...previousErrors,
+        password: null,
       }));
     }
   };
 
   const handleLogin = async () => {
+    if (!validateForm() || submitting) {
+      return;
+    }
+
     try {
       setSubmitting(true);
-      setErrors({});
 
-      const result = await login(formData);
+      const result = await login({
+        email: email.trim().toLowerCase(),
 
-      if (!result.success) {
-        if (result.errors) {
-          setErrors(result.errors);
-        }
+        password,
+      });
 
-        Alert.alert("Đăng nhập thất bại", result.message);
+      if (!result?.success) {
+        Alert.alert(
+          "Đăng nhập thất bại",
+          result?.message || "Email hoặc mật khẩu không đúng.",
+        );
       }
     } catch (error) {
-      console.error("Lỗi khi đăng nhập:", error);
+      console.error("Lỗi đăng nhập:", error);
 
-      Alert.alert("Có lỗi xảy ra", "Không thể đăng nhập tài khoản.");
+      Alert.alert("Có lỗi xảy ra", "Không thể đăng nhập vào lúc này.");
     } finally {
       setSubmitting(false);
     }
@@ -66,91 +113,129 @@ export default function LoginScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
-        style={styles.keyboardContainer}
+        style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          keyboardShouldPersistTaps="handled"
+          bounces={false}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Logo mặt trăng */}
-          <View style={styles.logoBox}>
-            <Ionicons name="moon" size={42} color="#FFFFFF" />
-          </View>
+          <ImageBackground
+            source={LOGIN_BACKGROUND}
+            style={styles.hero}
+            imageStyle={styles.heroImage}
+          >
+            <View style={styles.heroOverlay}>
+              <View style={styles.brandRow}>
+                <View style={styles.logoBox}>
+                  <Image
+                    source={APP_LOGO}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
+                </View>
 
-          <Text style={styles.appName}>Night Sweet</Text>
+                <View>
+                  <Text style={styles.brandName}>Night Sweet</Text>
 
-          <Text style={styles.appDescription}>
-            Chợ đồ cũ dành cho sinh viên
-          </Text>
+                  <Text style={styles.brandSubtitle}>CHỢ SINH VIÊN</Text>
+                </View>
+              </View>
 
-          <View style={styles.formCard}>
-            <Text style={styles.title}>Đăng nhập</Text>
+              <View>
+                <Text style={styles.heroTitle}>Chào mừng trở lại</Text>
 
-            <Text style={styles.subtitle}>Chào mừng bạn quay trở lại</Text>
+                <Text style={styles.heroDescription}>
+                  Đăng nhập để mua bán, trò chuyện và quản lý sản phẩm của bạn.
+                </Text>
+              </View>
+            </View>
+          </ImageBackground>
 
-            {/* Email */}
+          <View style={styles.formContainer}>
+            <Text style={styles.formTitle}>Đăng nhập</Text>
+
+            <Text style={styles.formSubtitle}>
+              Nhập thông tin tài khoản Night Sweet
+            </Text>
+
             <Text style={styles.label}>EMAIL</Text>
 
             <View
-              style={[styles.inputContainer, errors.email && styles.inputError]}
+              style={[
+                styles.inputContainer,
+
+                errors.email && styles.errorBorder,
+              ]}
             >
-              <Ionicons name="mail-outline" size={20} color="#A1A18E" />
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color={COLORS.textMuted}
+              />
 
               <TextInput
-                value={formData.email}
-                onChangeText={(value) => updateField("email", value)}
-                placeholder="example@gmail.com"
-                placeholderTextColor="#A1A18E"
-                keyboardType="email-address"
+                value={email}
+                onChangeText={handleEmailChange}
+                placeholder="example@email.com"
+                placeholderTextColor={COLORS.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="email-address"
+                returnKeyType="next"
                 style={styles.input}
               />
             </View>
 
             <ErrorText message={errors.email} />
 
-            {/* Mật khẩu */}
             <Text style={styles.label}>MẬT KHẨU</Text>
 
             <View
               style={[
                 styles.inputContainer,
-                errors.password && styles.inputError,
+
+                errors.password && styles.errorBorder,
               ]}
             >
-              <Ionicons name="lock-closed-outline" size={20} color="#A1A18E" />
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color={COLORS.textMuted}
+              />
 
               <TextInput
-                value={formData.password}
-                onChangeText={(value) => updateField("password", value)}
+                value={password}
+                onChangeText={handlePasswordChange}
                 placeholder="Nhập mật khẩu"
-                placeholderTextColor="#A1A18E"
+                placeholderTextColor={COLORS.textMuted}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
                 style={styles.input}
               />
 
               <TouchableOpacity
                 activeOpacity={0.7}
+                style={styles.passwordButton}
                 onPress={() =>
                   setShowPassword((previousValue) => !previousValue)
                 }
               >
                 <Ionicons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={21}
-                  color="#A1A18E"
+                  size={20}
+                  color={COLORS.textMuted}
                 />
               </TouchableOpacity>
             </View>
 
             <ErrorText message={errors.password} />
 
-            {/* Nút đăng nhập */}
             <TouchableOpacity
               activeOpacity={0.85}
               disabled={submitting}
@@ -158,26 +243,48 @@ export default function LoginScreen({ navigation }) {
               onPress={handleLogin}
             >
               {submitting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator color={COLORS.white} />
               ) : (
                 <>
-                  <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
+                  <Ionicons
+                    name="log-in-outline"
+                    size={21}
+                    color={COLORS.white}
+                  />
 
                   <Text style={styles.loginButtonText}>ĐĂNG NHẬP</Text>
                 </>
               )}
             </TouchableOpacity>
 
-            {/* Chuyển sang đăng ký */}
             <View style={styles.registerRow}>
-              <Text style={styles.registerDescription}>Chưa có tài khoản?</Text>
+              <Text style={styles.registerQuestion}>Chưa có tài khoản?</Text>
 
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate("Register")}
               >
-                <Text style={styles.registerLink}>Đăng ký ngay</Text>
+                <Text style={styles.registerText}>Đăng ký ngay</Text>
               </TouchableOpacity>
+            </View>
+
+            <View style={styles.infoCard}>
+              <View style={styles.infoIcon}>
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={23}
+                  color={COLORS.primary}
+                />
+              </View>
+
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>An toàn và riêng tư</Text>
+
+                <Text style={styles.infoDescription}>
+                  Thông tin đăng nhập chỉ được lưu trên thiết bị trong quá trình
+                  thử nghiệm ứng dụng.
+                </Text>
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -197,140 +304,177 @@ function ErrorText({ message }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FDFCF8",
+    backgroundColor: COLORS.background,
   },
 
-  keyboardContainer: {
+  keyboardView: {
     flex: 1,
   },
 
   scrollContent: {
     flexGrow: 1,
+    backgroundColor: COLORS.background,
+  },
 
+  hero: {
+    height: 300,
+  },
+
+  heroImage: {
+    resizeMode: "cover",
+  },
+
+  heroOverlay: {
+    flex: 1,
+    justifyContent: "space-between",
+
+    backgroundColor: "rgba(48,43,73,0.54)",
+
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 52,
+  },
+
+  brandRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-
-    paddingHorizontal: 20,
-    paddingVertical: 35,
   },
 
   logoBox: {
-    width: 74,
-    height: 74,
-    borderRadius: 22,
-
-    backgroundColor: "#7A8450",
+    width: 54,
+    height: 54,
+    borderRadius: 17,
 
     alignItems: "center",
     justifyContent: "center",
 
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    shadowOpacity: 0.14,
-    shadowRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.94)",
 
-    elevation: 5,
+    padding: 5,
+
+    overflow: "hidden",
+
+    marginRight: 11,
   },
 
-  appName: {
-    color: "#4A4A3A",
-    fontSize: 28,
-    fontWeight: "800",
-
-    marginTop: 14,
-  },
-
-  appDescription: {
-    color: "#8A8A75",
-    fontSize: 13,
-
-    marginTop: 4,
-    marginBottom: 28,
-  },
-
-  formCard: {
+  logoImage: {
     width: "100%",
-
-    backgroundColor: "#FFFFFF",
-
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
-
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.06,
-    shadowRadius: 7,
-
-    elevation: 3,
+    height: "100%",
   },
 
-  title: {
-    color: "#4A4A3A",
-    fontSize: 24,
+  brandName: {
+    color: COLORS.white,
+    fontSize: 19,
     fontWeight: "800",
   },
 
-  subtitle: {
-    color: "#A1A18E",
+  brandSubtitle: {
+    color: "rgba(255,255,255,0.80)",
+
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1.8,
+
+    marginTop: 2,
+  },
+
+  heroTitle: {
+    color: COLORS.white,
+    fontSize: 29,
+    fontWeight: "800",
+  },
+
+  heroDescription: {
+    maxWidth: 320,
+
+    color: "rgba(255,255,255,0.88)",
+
+    fontSize: 13,
+    lineHeight: 20,
+
+    marginTop: 8,
+  },
+
+  formContainer: {
+    flex: 1,
+
+    backgroundColor: COLORS.background,
+
+    paddingHorizontal: 22,
+    paddingTop: 25,
+    paddingBottom: 35,
+
+    marginTop: -24,
+
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
+
+  formTitle: {
+    color: COLORS.text,
+    fontSize: 25,
+    fontWeight: "800",
+  },
+
+  formSubtitle: {
+    color: COLORS.textMuted,
     fontSize: 12,
 
     marginTop: 4,
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   label: {
-    color: "#A1A18E",
+    color: COLORS.textMuted,
     fontSize: 10,
     fontWeight: "800",
-
-    letterSpacing: 0.7,
+    letterSpacing: 0.8,
 
     marginTop: 18,
     marginBottom: 8,
   },
 
   inputContainer: {
-    minHeight: 52,
+    height: 53,
 
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FDFCF8",
+    backgroundColor: COLORS.card,
+
+    paddingLeft: 14,
+    paddingRight: 8,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
+    borderColor: COLORS.border,
     borderRadius: 16,
-
-    paddingHorizontal: 14,
   },
 
   input: {
     flex: 1,
-    height: 50,
+    height: 51,
 
-    color: "#5D5D4D",
+    color: COLORS.text,
     fontSize: 14,
-    fontWeight: "500",
 
     paddingHorizontal: 10,
+    paddingVertical: 0,
   },
 
-  inputError: {
-    borderColor: "#C75C5C",
+  passwordButton: {
+    width: 36,
+    height: 36,
+
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  errorBorder: {
+    borderColor: COLORS.danger,
   },
 
   errorText: {
-    color: "#C75C5C",
+    color: COLORS.danger,
     fontSize: 11,
     fontWeight: "600",
 
@@ -338,38 +482,41 @@ const styles = StyleSheet.create({
   },
 
   loginButton: {
-    height: 54,
+    height: 55,
 
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#8B5E3C",
+    backgroundColor: COLORS.primary,
 
-    borderRadius: 16,
-    marginTop: 25,
+    borderRadius: 17,
 
-    shadowColor: "#8B5E3C",
+    marginTop: 27,
+
+    shadowColor: COLORS.primaryDark,
+
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
 
     elevation: 4,
   },
 
-  disabledButton: {
-    opacity: 0.65,
-  },
-
   loginButtonText: {
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontSize: 14,
     fontWeight: "800",
 
     marginLeft: 8,
+  },
+
+  disabledButton: {
+    opacity: 0.65,
   },
 
   registerRow: {
@@ -377,19 +524,62 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    marginTop: 21,
+    marginTop: 22,
   },
 
-  registerDescription: {
-    color: "#8A8A75",
+  registerQuestion: {
+    color: COLORS.textSecondary,
     fontSize: 13,
   },
 
-  registerLink: {
-    color: "#7A8450",
+  registerText: {
+    color: COLORS.primary,
     fontSize: 13,
     fontWeight: "800",
 
     marginLeft: 5,
+  },
+
+  infoCard: {
+    flexDirection: "row",
+
+    backgroundColor: COLORS.primarySoft,
+
+    padding: 14,
+
+    borderRadius: 18,
+
+    marginTop: 28,
+  },
+
+  infoIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: COLORS.card,
+
+    marginRight: 11,
+  },
+
+  infoContent: {
+    flex: 1,
+  },
+
+  infoTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  infoDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    lineHeight: 16,
+
+    marginTop: 3,
   },
 });

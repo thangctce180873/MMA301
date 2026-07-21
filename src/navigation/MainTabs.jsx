@@ -1,14 +1,22 @@
+import { COLORS } from "../constants/colors";
 import React from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
+
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { Ionicons } from "@expo/vector-icons";
-import HomeScreen from "../screens/HomeScreen";
+
 import AddScreen from "../screens/AddScreen";
+import ConversationsScreen from "../screens/ConversationsScreen";
+import HomeScreen from "../screens/HomeScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
+
 const APP_BAR_HEIGHT = 64;
+
 const getTabIcon = (routeName, focused) => {
   switch (routeName) {
     case "Home":
@@ -16,6 +24,9 @@ const getTabIcon = (routeName, focused) => {
 
     case "Add":
       return focused ? "add-circle" : "add-circle-outline";
+
+    case "MessagesTab":
+      return focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline";
 
     case "Profile":
       return focused ? "person" : "person-outline";
@@ -36,20 +47,29 @@ export default function MainTabs() {
 
         tabBarHideOnKeyboard: true,
 
-        tabBarActiveTintColor: "#7A8450",
+        tabBarActiveTintColor: COLORS.primary,
 
-        tabBarInactiveTintColor: "#A1A18E",
+        tabBarInactiveTintColor: COLORS.textMuted,
 
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons
-            name={getTabIcon(route.name, focused)}
-            size={focused ? 23 : 22}
-            color={color}
-          />
+          <View
+            style={[
+              styles.tabIconContainer,
+
+              focused && styles.activeTabIconContainer,
+            ]}
+          >
+            <Ionicons
+              name={getTabIcon(route.name, focused)}
+              size={focused ? 21 : 22}
+              color={color}
+            />
+          </View>
         ),
 
         tabBarStyle: [
           styles.tabBar,
+
           {
             height: APP_BAR_HEIGHT + insets.bottom,
 
@@ -83,6 +103,14 @@ export default function MainTabs() {
       />
 
       <Tab.Screen
+        name="MessagesTab"
+        component={ConversationsScreen}
+        options={{
+          title: "Tin nhắn",
+        }}
+      />
+
+      <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
@@ -101,9 +129,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
-    paddingTop: 0,
+    paddingTop: 1,
 
     marginHorizontal: 0,
     marginBottom: 0,
@@ -111,32 +139,41 @@ const styles = StyleSheet.create({
     borderRadius: 0,
 
     borderTopWidth: 1,
-    borderTopColor: "#E8E4D9",
+    borderTopColor: COLORS.border,
 
-    shadowColor: "#000000",
-
+    shadowColor: COLORS.primaryDark,
     shadowOffset: {
       width: 0,
-      height: -2,
+      height: -3,
     },
-
     shadowOpacity: 0.05,
+    shadowRadius: 8,
 
-    shadowRadius: 5,
+    elevation: 9,
+  },
 
-    elevation: 8,
+  tabIconContainer: {
+    width: 36,
+    height: 30,
+    borderRadius: 12,
+
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  activeTabIconContainer: {
+    backgroundColor: COLORS.primaryLight,
   },
 
   tabBarIcon: {
-    marginTop: 7,
+    marginTop: 5,
   },
 
   tabBarLabel: {
     fontSize: 9,
-
     fontWeight: "700",
 
-    marginTop: 1,
-    marginBottom: 6,
+    marginTop: 0,
+    marginBottom: 5,
   },
 });

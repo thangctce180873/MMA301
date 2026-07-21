@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import { COLORS } from "../constants/colors";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -15,31 +16,30 @@ import {
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 
 import BackButton from "../components/BackButton";
+
 import { useAuth } from "../context/AuthContext";
+import { getUserInitials } from "../utils/authUtils";
 
-import {
-  formatBirthDateInput,
-  getUserInitials,
-  validateProfileData,
-} from "../utils/authUtils";
-
-const createFormData = (user) => ({
-  avatarUri: user?.avatarUri || "",
+const createFormDataFromUser = (user) => ({
   name: user?.name || "",
   birthDate: user?.birthDate || "",
   email: user?.email || "",
   phone: user?.phone || "",
+  avatarUri: user?.avatarUri || "",
 });
 
 export default function PersonalInfoScreen({ navigation }) {
   const { user, updateProfile, deleteAccount } = useAuth();
 
-  const [formData, setFormData] = useState(() => createFormData(user));
+  const [formData, setFormData] = useState(() => createFormDataFromUser(user));
+
+  const [originalFormData, setOriginalFormData] = useState(() =>
+    createFormDataFromUser(user),
+  );
 
   const [errors, setErrors] = useState({});
 
@@ -47,13 +47,30 @@ export default function PersonalInfoScreen({ navigation }) {
 
   const [saving, setSaving] = useState(false);
 
-  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [changingAvatar, setChangingAvatar] = useState(false);
+
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    setFormData(createFormData(user));
+    const nextFormData = createFormDataFromUser(user);
+
+    setFormData(nextFormData);
+    setOriginalFormData(nextFormData);
   }, [user]);
 
+  const initials = getUserInitials(formData.name || user?.name);
+
+  const busy = saving || changingAvatar || deleting;
+
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(formData) !== JSON.stringify(originalFormData);
+  }, [formData, originalFormData]);
+
   const updateField = (field, value) => {
+    if (!isEditing) {
+      return;
+    }
+
     setFormData((previousData) => ({
       ...previousData,
       [field]: value,
@@ -67,42 +84,133 @@ export default function PersonalInfoScreen({ navigation }) {
     }
   };
 
-  const handleStartEditing = () => {
+  const startEditing = () => {
+    if (busy) {
+      return;
+    }
+
+    setOriginalFormData({
+      ...formData,
+    });
+
     setErrors({});
     setIsEditing(true);
   };
 
-  const handleCancelEditing = () => {
-    setFormData(createFormData(user));
+  const cancelEditing = () => {
+    if (busy) {
+      return;
+    }
+
+    setFormData({
+      ...originalFormData,
+    });
+
     setErrors({});
     setIsEditing(false);
   };
 
   const handleBack = () => {
-    if (!isEditing) {
-      navigation.goBack();
+    if (isEditing && hasChanges) {
+      Alert.alert(
+        "Hủy chỉnh sửa",
+        "Các thay đổi chưa được lưu. Bạn có muốn bỏ các thay đổi này không?",
+        [
+          {
+            text: "Tiếp tục chỉnh sửa",
+            style: "cancel",
+          },
+          {
+            text: "Bỏ thay đổi",
+            style: "destructive",
+
+            onPress: () => {
+              setFormData({
+                ...originalFormData,
+              });
+
+              setErrors({});
+              setIsEditing(false);
+
+              navigation.goBack();
+            },
+          },
+        ],
+      );
+
       return;
     }
 
-    Alert.alert(
-      "Hủy chỉnh sửa",
-      "Các thay đổi chưa lưu sẽ bị mất. Bạn có muốn quay lại không?",
-      [
-        {
-          text: "Tiếp tục sửa",
-          style: "cancel",
-        },
-        {
-          text: "Quay lại",
-          style: "destructive",
-          onPress: () => navigation.goBack(),
-        },
-      ],
+    navigation.goBack();
+  };
+
+  const formatBirthDate = (value) => {
+    const numbers = value.replace(/\D/g, "").slice(0, 8);
+
+    if (numbers.length <= 2) {
+      return numbers;
+    }
+
+    if (numbers.length <= 4) {
+      return `${numbers.slice(0, 2)}/${numbers.slice(2)}`;
+    }
+
+    return `${numbers.slice(0, 2)}/${numbers.slice(2, 4)}/${numbers.slice(4)}`;
+  };
+
+  const validateBirthDate = (value) => {
+    if (!value) {
+      return true;
+    }
+
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+      return false;
+    }
+
+    const [day, month, year] = value.split("/").map(Number);
+
+    const date = new Date(year, month - 1, day);
+
+    return (
+      date.getFullYear() === year &&
+      date.getMonth() === month - 1 &&
+      date.getDate() === day &&
+      date <= new Date()
     );
   };
 
+  const validateForm = () => {
+    const nextErrors = {};
+
+    if (!formData.name.trim()) {
+      nextErrors.name = "Vui lòng nhập họ và tên";
+    }
+
+    if (!validateBirthDate(formData.birthDate)) {
+      nextErrors.birthDate = "Ngày sinh không hợp lệ";
+    }
+
+    const normalizedEmail = formData.email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      nextErrors.email = "Vui lòng nhập email";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = "Email không đúng định dạng";
+    }
+
+    const phone = formData.phone.replace(/\D/g, "");
+
+    if (phone && !/^0\d{9}$/.test(phone)) {
+      nextErrors.phone = "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0";
+    }
+
+    setErrors(nextErrors);
+
+    return Object.keys(nextErrors).length === 0;
+  };
+
   const pickAvatar = async () => {
-    if (!isEditing) {
+    if (!isEditing || busy) {
       return;
     }
 
@@ -113,7 +221,7 @@ export default function PersonalInfoScreen({ navigation }) {
       if (!permission.granted) {
         Alert.alert(
           "Không có quyền truy cập",
-          "Bạn cần cấp quyền truy cập thư viện ảnh để chọn avatar.",
+          "Bạn cần cấp quyền truy cập thư viện ảnh.",
         );
 
         return;
@@ -127,18 +235,29 @@ export default function PersonalInfoScreen({ navigation }) {
         allowsMultipleSelection: false,
       });
 
-      if (!result.canceled && result.assets?.length > 0) {
-        updateField("avatarUri", result.assets[0].uri);
+      if (result.canceled || !result.assets?.length) {
+        return;
       }
-    } catch (error) {
-      console.error("Lỗi khi chọn avatar:", error);
 
-      Alert.alert("Có lỗi xảy ra", "Không thể mở thư viện ảnh.");
+      setChangingAvatar(true);
+
+      const avatarUri = result.assets[0].uri;
+
+      setFormData((previousData) => ({
+        ...previousData,
+        avatarUri,
+      }));
+    } catch (error) {
+      console.error("Lỗi chọn ảnh đại diện:", error);
+
+      Alert.alert("Có lỗi xảy ra", "Không thể chọn ảnh đại diện.");
+    } finally {
+      setChangingAvatar(false);
     }
   };
 
-  const handleRemoveAvatar = () => {
-    if (!isEditing) {
+  const removeAvatar = () => {
+    if (!isEditing || busy) {
       return;
     }
 
@@ -153,50 +272,86 @@ export default function PersonalInfoScreen({ navigation }) {
         {
           text: "Xóa",
           style: "destructive",
-          onPress: () => updateField("avatarUri", ""),
+
+          onPress: () => {
+            setFormData((previousData) => ({
+              ...previousData,
+              avatarUri: "",
+            }));
+          },
         },
       ],
     );
   };
 
+  const handleAvatarPress = () => {
+    if (!isEditing || busy) {
+      return;
+    }
+
+    const options = [
+      {
+        text: "Chọn ảnh từ thư viện",
+        onPress: pickAvatar,
+      },
+    ];
+
+    if (formData.avatarUri) {
+      options.push({
+        text: "Xóa ảnh đại diện",
+        style: "destructive",
+        onPress: removeAvatar,
+      });
+    }
+
+    options.push({
+      text: "Hủy",
+      style: "cancel",
+    });
+
+    Alert.alert("Ảnh đại diện", "Chọn thao tác", options);
+  };
+
   const handleSave = async () => {
-    const validation = validateProfileData(formData);
-
-    if (!validation.isValid) {
-      setErrors(validation.errors);
-
-      Alert.alert(
-        "Thông tin chưa hợp lệ",
-        "Vui lòng kiểm tra lại các trường được báo lỗi.",
-      );
-
+    if (!isEditing || saving || !validateForm()) {
       return;
     }
 
     try {
       setSaving(true);
-      setErrors({});
 
-      const result = await updateProfile(formData);
+      const nextProfile = {
+        name: formData.name.trim(),
 
-      if (!result.success) {
-        if (result.errors) {
-          setErrors(result.errors);
-        }
+        birthDate: formData.birthDate,
 
-        Alert.alert("Cập nhật thất bại", result.message);
+        email: formData.email.trim().toLowerCase(),
+
+        phone: formData.phone.replace(/\D/g, ""),
+
+        avatarUri: formData.avatarUri || "",
+      };
+
+      const result = await updateProfile(nextProfile);
+
+      if (!result?.success) {
+        Alert.alert(
+          "Cập nhật thất bại",
+          result?.message || "Không thể cập nhật thông tin.",
+        );
 
         return;
       }
 
+      setFormData(nextProfile);
+      setOriginalFormData(nextProfile);
+
+      setErrors({});
       setIsEditing(false);
 
-      Alert.alert(
-        "Cập nhật thành công",
-        "Thông tin cá nhân của bạn đã được cập nhật.",
-      );
+      Alert.alert("Cập nhật thành công", "Thông tin cá nhân đã được lưu.");
     } catch (error) {
-      console.error("Lỗi khi lưu thông tin:", error);
+      console.error("Lỗi cập nhật thông tin:", error);
 
       Alert.alert("Có lỗi xảy ra", "Không thể cập nhật thông tin cá nhân.");
     } finally {
@@ -204,42 +359,32 @@ export default function PersonalInfoScreen({ navigation }) {
     }
   };
 
-  const performDeleteAccount = async () => {
-    try {
-      setDeletingAccount(true);
-
-      const result = await deleteAccount();
-
-      if (!result.success) {
-        Alert.alert("Xóa tài khoản thất bại", result.message);
-
-        return;
-      }
-
-      Alert.alert(
-        "Đã xóa tài khoản",
-        "Tài khoản và toàn bộ dữ liệu liên quan đã được xóa.",
-      );
-    } catch (error) {
-      console.error("Lỗi khi xóa tài khoản:", error);
-
-      Alert.alert(
-        "Có lỗi xảy ra",
-        "Không thể xóa tài khoản. Vui lòng thử lại.",
-      );
-    } finally {
-      setDeletingAccount(false);
+  const handleHeaderAction = () => {
+    if (isEditing) {
+      handleSave();
+      return;
     }
+
+    startEditing();
+  };
+
+  const handleMainAction = () => {
+    if (isEditing) {
+      handleSave();
+      return;
+    }
+
+    startEditing();
   };
 
   const handleDeleteAccount = () => {
-    if (isEditing || saving || deletingAccount) {
+    if (busy) {
       return;
     }
 
     Alert.alert(
       "Xóa tài khoản",
-      "Toàn bộ tin đăng và dữ liệu đã lưu của bạn cũng sẽ bị xóa. Bạn có muốn tiếp tục không?",
+      "Toàn bộ thông tin tài khoản sẽ bị xóa khỏi thiết bị. Hành động này không thể hoàn tác.",
       [
         {
           text: "Hủy",
@@ -248,19 +393,41 @@ export default function PersonalInfoScreen({ navigation }) {
         {
           text: "Tiếp tục",
           style: "destructive",
+
           onPress: () => {
             Alert.alert(
               "Xác nhận lần cuối",
-              "Hành động này không thể hoàn tác. Bạn chắc chắn muốn xóa tài khoản?",
+              "Bạn có chắc chắn muốn xóa tài khoản Night Sweet không?",
               [
                 {
                   text: "Không",
                   style: "cancel",
                 },
                 {
-                  text: "Xóa vĩnh viễn",
+                  text: "Xóa tài khoản",
+
                   style: "destructive",
-                  onPress: performDeleteAccount,
+
+                  onPress: async () => {
+                    try {
+                      setDeleting(true);
+
+                      const result = await deleteAccount();
+
+                      if (!result?.success) {
+                        Alert.alert(
+                          "Xóa tài khoản thất bại",
+                          result?.message || "Không thể xóa tài khoản.",
+                        );
+                      }
+                    } catch (error) {
+                      console.error("Lỗi xóa tài khoản:", error);
+
+                      Alert.alert("Có lỗi xảy ra", "Không thể xóa tài khoản.");
+                    } finally {
+                      setDeleting(false);
+                    }
+                  },
                 },
               ],
             );
@@ -270,45 +437,41 @@ export default function PersonalInfoScreen({ navigation }) {
     );
   };
 
-  const initials = getUserInitials(formData.name);
-
-  const joinedDate = user?.createdAt
-    ? new Date(user.createdAt).toLocaleDateString("vi-VN")
-    : "Chưa xác định";
-
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
-        style={styles.keyboardContainer}
+        style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.header}>
-          <BackButton
-            disabled={saving || deletingAccount}
-            onPress={handleBack}
-          />
+          <BackButton disabled={busy} onPress={handleBack} />
 
-          <View style={styles.headerText}>
+          <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>Thông tin cá nhân</Text>
 
-            <Text style={styles.headerSubtitle}>Quản lý dữ liệu tài khoản</Text>
+            <Text style={styles.headerSubtitle}>
+              {isEditing
+                ? "Chỉnh sửa hồ sơ tài khoản"
+                : "Quản lý hồ sơ tài khoản"}
+            </Text>
           </View>
 
-          {!isEditing ? (
-            <TouchableOpacity
-              activeOpacity={0.75}
-              disabled={deletingAccount}
-              style={[
-                styles.headerActionButton,
-                deletingAccount && styles.disabledButton,
-              ]}
-              onPress={handleStartEditing}
-            >
-              <Ionicons name="create-outline" size={22} color="#7A8450" />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.headerActionSpacer} />
-          )}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            disabled={busy}
+            style={[styles.headerActionButton, busy && styles.disabledButton]}
+            onPress={handleHeaderAction}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={COLORS.success} />
+            ) : (
+              <Ionicons
+                name={isEditing ? "checkmark" : "create-outline"}
+                size={isEditing ? 25 : 21}
+                color={isEditing ? COLORS.success : COLORS.primary}
+              />
+            )}
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -319,9 +482,9 @@ export default function PersonalInfoScreen({ navigation }) {
           <View style={styles.profileCard}>
             <TouchableOpacity
               activeOpacity={isEditing ? 0.85 : 1}
+              disabled={!isEditing || changingAvatar}
               style={styles.avatarContainer}
-              disabled={!isEditing}
-              onPress={pickAvatar}
+              onPress={handleAvatarPress}
             >
               {formData.avatarUri ? (
                 <Image
@@ -337,7 +500,11 @@ export default function PersonalInfoScreen({ navigation }) {
 
               {isEditing ? (
                 <View style={styles.cameraBadge}>
-                  <Ionicons name="camera" size={17} color="#FFFFFF" />
+                  {changingAvatar ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Ionicons name="camera" size={16} color={COLORS.white} />
+                  )}
                 </View>
               ) : null}
             </TouchableOpacity>
@@ -346,224 +513,177 @@ export default function PersonalInfoScreen({ navigation }) {
               {formData.name || "Người dùng"}
             </Text>
 
-            <Text style={styles.profileEmail}>
-              {formData.email || "Chưa cập nhật email"}
-            </Text>
-
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={15} color="#7A8450" />
-
-              <Text style={styles.verifiedText}>TÀI KHOẢN ĐÃ XÁC THỰC</Text>
-            </View>
+            <Text style={styles.profileEmail}>{formData.email}</Text>
 
             {isEditing ? (
-              <View style={styles.avatarActions}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={styles.avatarActionButton}
-                  onPress={pickAvatar}
-                >
-                  <Ionicons name="image-outline" size={18} color="#7A8450" />
+              <TouchableOpacity
+                activeOpacity={0.75}
+                disabled={changingAvatar}
+                onPress={handleAvatarPress}
+              >
+                <Text style={styles.changeAvatarText}>
+                  Thay đổi ảnh đại diện
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.viewModeBadge}>
+                <Ionicons name="eye-outline" size={13} color={COLORS.primary} />
 
-                  <Text style={styles.avatarActionText}>Chọn ảnh</Text>
-                </TouchableOpacity>
-
-                {formData.avatarUri ? (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.removeAvatarButton}
-                    onPress={handleRemoveAvatar}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#B44A4A" />
-
-                    <Text style={styles.removeAvatarText}>Xóa ảnh</Text>
-                  </TouchableOpacity>
-                ) : null}
+                <Text style={styles.viewModeText}>CHẾ ĐỘ XEM</Text>
               </View>
-            ) : null}
+            )}
           </View>
 
-          <Text style={styles.sectionLabel}>THÔNG TIN CƠ BẢN</Text>
+          <Text style={styles.sectionTitle}>THÔNG TIN TÀI KHOẢN</Text>
 
           <View style={styles.formCard}>
             <FormField
               label="Họ và tên"
-              iconName="person-outline"
+              icon="person-outline"
               value={formData.name}
-              placeholder="Nhập họ và tên"
               editable={isEditing}
-              error={errors.name}
-              autoCapitalize="words"
               onChangeText={(value) => updateField("name", value)}
+              placeholder="Nhập họ và tên"
+              error={errors.name}
             />
 
             <FormField
-              label="Ngày tháng năm sinh"
-              iconName="calendar-outline"
+              label="Ngày sinh"
+              icon="calendar-outline"
               value={formData.birthDate}
-              placeholder="DD/MM/YYYY"
               editable={isEditing}
-              error={errors.birthDate}
+              onChangeText={(value) =>
+                updateField("birthDate", formatBirthDate(value))
+              }
+              placeholder="DD/MM/YYYY"
               keyboardType="number-pad"
               maxLength={10}
-              onChangeText={(value) =>
-                updateField("birthDate", formatBirthDateInput(value))
-              }
+              error={errors.birthDate}
             />
 
             <FormField
               label="Email"
-              iconName="mail-outline"
+              icon="mail-outline"
               value={formData.email}
-              placeholder="Nhập email"
               editable={isEditing}
-              error={errors.email}
+              onChangeText={(value) => updateField("email", value)}
+              placeholder="example@email.com"
               keyboardType="email-address"
               autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={(value) => updateField("email", value)}
+              error={errors.email}
             />
 
             <FormField
               label="Số điện thoại"
-              iconName="call-outline"
+              icon="call-outline"
               value={formData.phone}
-              placeholder="Nhập số điện thoại"
               editable={isEditing}
-              error={errors.phone}
+              onChangeText={(value) =>
+                updateField("phone", value.replace(/\D/g, ""))
+              }
+              placeholder="0912345678"
               keyboardType="phone-pad"
               maxLength={10}
-              showBorder={false}
-              onChangeText={(value) =>
-                updateField("phone", value.replace(/[^0-9]/g, ""))
-              }
-            />
-          </View>
-
-          <Text style={styles.sectionLabel}>THÔNG TIN TÀI KHOẢN</Text>
-
-          <View style={styles.accountCard}>
-            <AccountInfoRow
-              iconName="finger-print-outline"
-              title="Mã tài khoản"
-              value={user?.id ? String(user.id).slice(0, 16) : "Chưa xác định"}
-            />
-
-            <AccountInfoRow
-              iconName="time-outline"
-              title="Ngày tham gia"
-              value={joinedDate}
+              error={errors.phone}
               showBorder={false}
             />
           </View>
 
-          <Text style={styles.sectionLabel}>BẢO MẬT</Text>
+          <Text style={styles.sectionTitle}>BẢO MẬT</Text>
+
+          <View style={styles.menuCard}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              style={styles.menuItem}
+              onPress={() => navigation.navigate("ChangePassword")}
+            >
+              <View style={styles.menuIcon}>
+                <Ionicons name="key-outline" size={21} color={COLORS.primary} />
+              </View>
+
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Đổi mật khẩu</Text>
+
+                <Text style={styles.menuDescription}>
+                  Cập nhật mật khẩu đăng nhập tài khoản
+                </Text>
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={19}
+                color={COLORS.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
-            activeOpacity={0.8}
-            disabled={isEditing || saving || deletingAccount}
-            style={[
-              styles.securityOption,
-              (isEditing || saving || deletingAccount) && styles.disabledButton,
-            ]}
-            onPress={() => navigation.navigate("ChangePassword")}
+            activeOpacity={0.85}
+            disabled={busy}
+            style={[styles.mainActionButton, busy && styles.disabledButton]}
+            onPress={handleMainAction}
           >
-            <View style={styles.securityIcon}>
-              <Ionicons name="key-outline" size={22} color="#7A8450" />
-            </View>
+            {saving ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <>
+                <Ionicons
+                  name={isEditing ? "save-outline" : "create-outline"}
+                  size={20}
+                  color={COLORS.white}
+                />
 
-            <View style={styles.securityInfo}>
-              <Text style={styles.securityTitle}>Đổi mật khẩu</Text>
-
-              <Text style={styles.securityDescription}>
-                Cập nhật mật khẩu đăng nhập
-              </Text>
-            </View>
-
-            <Ionicons name="chevron-forward" size={20} color="#A1A18E" />
+                <Text style={styles.mainActionButtonText}>
+                  {isEditing ? "LƯU THAY ĐỔI" : "CHỈNH SỬA THÔNG TIN"}
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
 
           {isEditing ? (
-            <View style={styles.actionContainer}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                disabled={saving}
-                style={styles.cancelButton}
-                onPress={handleCancelEditing}
-              >
-                <Text style={styles.cancelText}>HỦY</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                disabled={saving}
-                style={[styles.saveButton, saving && styles.disabledButton]}
-                onPress={handleSave}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="save-outline" size={20} color="#FFFFFF" />
-
-                    <Text style={styles.saveText}>LƯU THAY ĐỔI</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          ) : (
             <TouchableOpacity
-              activeOpacity={0.85}
-              disabled={deletingAccount}
-              style={[
-                styles.editButton,
-                deletingAccount && styles.disabledButton,
-              ]}
-              onPress={handleStartEditing}
+              activeOpacity={0.8}
+              disabled={busy}
+              style={styles.cancelEditButton}
+              onPress={cancelEditing}
             >
-              <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+              <Ionicons
+                name="close-outline"
+                size={20}
+                color={COLORS.textSecondary}
+              />
 
-              <Text style={styles.editText}>CHỈNH SỬA THÔNG TIN</Text>
+              <Text style={styles.cancelEditText}>HỦY CHỈNH SỬA</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
 
-          <Text style={[styles.sectionLabel, styles.dangerSectionLabel]}>
+          <Text style={[styles.sectionTitle, styles.dangerSectionTitle]}>
             KHU VỰC NGUY HIỂM
           </Text>
 
           <View style={styles.dangerCard}>
-            <View style={styles.dangerHeader}>
-              <View style={styles.dangerIcon}>
-                <Ionicons name="warning-outline" size={22} color="#B44A4A" />
-              </View>
+            <View style={styles.dangerTextContainer}>
+              <Text style={styles.dangerTitle}>Xóa tài khoản</Text>
 
-              <View style={styles.dangerInfo}>
-                <Text style={styles.dangerTitle}>Xóa tài khoản</Text>
-
-                <Text style={styles.dangerDescription}>
-                  Xóa vĩnh viễn tài khoản, tin đăng và dữ liệu đã lưu.
-                </Text>
-              </View>
+              <Text style={styles.dangerDescription}>
+                Xóa tài khoản và thông tin cá nhân đã lưu trên thiết bị.
+              </Text>
             </View>
 
             <TouchableOpacity
-              activeOpacity={0.85}
-              disabled={isEditing || saving || deletingAccount}
-              style={[
-                styles.deleteAccountButton,
-                (isEditing || saving || deletingAccount) &&
-                  styles.disabledButton,
-              ]}
+              activeOpacity={0.8}
+              disabled={deleting}
+              style={[styles.deleteButton, deleting && styles.disabledButton]}
               onPress={handleDeleteAccount}
             >
-              {deletingAccount ? (
-                <ActivityIndicator size="small" color="#B44A4A" />
+              {deleting ? (
+                <ActivityIndicator size="small" color={COLORS.danger} />
               ) : (
-                <>
-                  <Ionicons name="trash-outline" size={20} color="#B44A4A" />
-
-                  <Text style={styles.deleteAccountText}>XÓA TÀI KHOẢN</Text>
-                </>
+                <Ionicons
+                  name="trash-outline"
+                  size={21}
+                  color={COLORS.danger}
+                />
               )}
             </TouchableOpacity>
           </View>
@@ -575,46 +695,44 @@ export default function PersonalInfoScreen({ navigation }) {
 
 function FormField({
   label,
-  iconName,
+  icon,
   value,
-  placeholder,
   editable,
-  error,
   onChangeText,
+  placeholder,
+  keyboardType,
+  autoCapitalize,
+  maxLength,
+  error,
   showBorder = true,
-  ...textInputProps
 }) {
   return (
-    <View
-      style={[styles.fieldContainer, showBorder && styles.fieldContainerBorder]}
-    >
-      <Text style={styles.fieldLabel}>{label}</Text>
+    <View style={[styles.formField, showBorder && styles.formFieldBorder]}>
+      <View style={styles.formFieldHeader}>
+        <View style={styles.formFieldIcon}>
+          <Ionicons name={icon} size={19} color={COLORS.primary} />
+        </View>
 
-      <View
-        style={[
-          styles.inputContainer,
-          editable && styles.editableInputContainer,
-          error && styles.errorInputContainer,
-        ]}
-      >
-        <Ionicons
-          name={iconName}
-          size={20}
-          color={editable ? "#7A8450" : "#A1A18E"}
-        />
+        <View style={styles.formFieldContent}>
+          <Text style={styles.formLabel}>{label}</Text>
 
-        <TextInput
-          value={value}
-          placeholder={placeholder}
-          placeholderTextColor="#B0AD9E"
-          editable={editable}
-          onChangeText={onChangeText}
-          style={[styles.input, !editable && styles.disabledInput]}
-          {...textInputProps}
-        />
+          <TextInput
+            value={value}
+            editable={editable}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+            placeholderTextColor={COLORS.textMuted}
+            keyboardType={keyboardType}
+            autoCapitalize={autoCapitalize || "sentences"}
+            autoCorrect={false}
+            maxLength={maxLength}
+            selectTextOnFocus={editable}
+            style={[styles.formInput, !editable && styles.readOnlyInput]}
+          />
+        </View>
 
-        {!editable ? (
-          <Ionicons name="lock-closed-outline" size={15} color="#C4C2B5" />
+        {editable ? (
+          <Ionicons name="create-outline" size={16} color={COLORS.primary} />
         ) : null}
       </View>
 
@@ -623,31 +741,13 @@ function FormField({
   );
 }
 
-function AccountInfoRow({ iconName, title, value, showBorder = true }) {
-  return (
-    <View
-      style={[styles.accountInfoRow, showBorder && styles.accountInfoBorder]}
-    >
-      <View style={styles.accountIcon}>
-        <Ionicons name={iconName} size={20} color="#7A8450" />
-      </View>
-
-      <View style={styles.accountInfoText}>
-        <Text style={styles.accountTitle}>{title}</Text>
-
-        <Text style={styles.accountValue}>{value}</Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FDFCF8",
+    backgroundColor: COLORS.background,
   },
 
-  keyboardContainer: {
+  keyboardView: {
     flex: 1,
   },
 
@@ -657,13 +757,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 14,
     paddingVertical: 10,
 
     borderBottomWidth: 1,
-    borderBottomColor: "#E8E4D9",
+    borderBottomColor: COLORS.border,
+  },
+
+  headerTextContainer: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  headerTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: "800",
+  },
+
+  headerSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+
+    marginTop: 2,
   },
 
   headerActionButton: {
@@ -674,524 +792,345 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
-  },
-
-  headerActionSpacer: {
-    width: 42,
-    height: 42,
-  },
-
-  headerText: {
-    flex: 1,
-    alignItems: "center",
-  },
-
-  headerTitle: {
-    color: "#4A4A3A",
-    fontSize: 17,
-    fontWeight: "800",
-  },
-
-  headerSubtitle: {
-    color: "#A1A18E",
-    fontSize: 10,
-    marginTop: 2,
+    backgroundColor: COLORS.primaryLight,
   },
 
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 38,
   },
 
   profileCard: {
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.primarySoft,
 
     paddingHorizontal: 20,
-    paddingVertical: 22,
+    paddingVertical: 23,
 
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
     borderRadius: 24,
-
-    elevation: 2,
   },
 
   avatarContainer: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
 
     position: "relative",
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#D6CEB8",
+    backgroundColor: COLORS.primaryLight,
 
     borderWidth: 4,
-    borderColor: "#FFFFFF",
-
-    elevation: 4,
+    borderColor: COLORS.white,
   },
 
   avatarImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 52,
+    borderRadius: 48,
   },
 
   avatarText: {
-    color: "#8A8A75",
-    fontSize: 25,
+    color: COLORS.primaryDark,
+    fontSize: 23,
     fontWeight: "800",
   },
 
   cameraBadge: {
     position: "absolute",
-    right: -1,
-    bottom: 3,
+    right: -2,
+    bottom: 2,
 
-    width: 34,
-    height: 34,
+    width: 33,
+    height: 33,
     borderRadius: 17,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#7A8450",
+    backgroundColor: COLORS.primary,
 
     borderWidth: 3,
-    borderColor: "#FFFFFF",
+    borderColor: COLORS.white,
   },
 
   profileName: {
-    color: "#4A4A3A",
-    fontSize: 21,
+    color: COLORS.text,
+    fontSize: 19,
     fontWeight: "800",
 
-    marginTop: 14,
+    marginTop: 13,
   },
 
   profileEmail: {
-    color: "#8A8A75",
-    fontSize: 12,
+    color: COLORS.textSecondary,
 
-    marginTop: 4,
+    fontSize: 11,
+
+    marginTop: 3,
   },
 
-  verifiedBadge: {
+  changeAvatarText: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: "800",
+
+    marginTop: 9,
+  },
+
+  viewModeBadge: {
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.card,
 
-    paddingHorizontal: 11,
+    paddingHorizontal: 10,
     paddingVertical: 6,
 
-    borderRadius: 14,
+    borderRadius: 13,
 
     marginTop: 10,
   },
 
-  verifiedText: {
-    color: "#7A8450",
-    fontSize: 9,
+  viewModeText: {
+    color: COLORS.primary,
+    fontSize: 8,
     fontWeight: "800",
 
     marginLeft: 5,
   },
 
-  avatarActions: {
-    flexDirection: "row",
-    alignItems: "center",
-
-    marginTop: 16,
-  },
-
-  avatarActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-
-    backgroundColor: "#F3F1E9",
-
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-
-    borderRadius: 14,
-  },
-
-  avatarActionText: {
-    color: "#7A8450",
-    fontSize: 11,
-    fontWeight: "800",
-
-    marginLeft: 6,
-  },
-
-  removeAvatarButton: {
-    flexDirection: "row",
-    alignItems: "center",
-
-    backgroundColor: "#FFF4F4",
-
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-
-    borderRadius: 14,
-    marginLeft: 9,
-  },
-
-  removeAvatarText: {
-    color: "#B44A4A",
-    fontSize: 11,
-    fontWeight: "800",
-
-    marginLeft: 6,
-  },
-
-  sectionLabel: {
-    color: "#A1A18E",
+  sectionTitle: {
+    color: COLORS.textMuted,
     fontSize: 10,
     fontWeight: "800",
-
     letterSpacing: 0.8,
 
-    marginTop: 23,
-    marginLeft: 5,
+    marginTop: 22,
     marginBottom: 8,
-  },
-
-  dangerSectionLabel: {
-    color: "#B44A4A",
+    marginLeft: 4,
   },
 
   formCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 15,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 22,
-
-    elevation: 2,
+    borderColor: COLORS.border,
+    borderRadius: 21,
   },
 
-  fieldContainer: {
-    paddingVertical: 14,
+  formField: {
+    paddingVertical: 12,
   },
 
-  fieldContainerBorder: {
+  formFieldBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: "#E8E4D9",
+    borderBottomColor: COLORS.border,
   },
 
-  fieldLabel: {
-    color: "#8A8A75",
-    fontSize: 10,
-    fontWeight: "700",
-
-    marginBottom: 7,
-  },
-
-  inputContainer: {
-    minHeight: 49,
-
+  formFieldHeader: {
     flexDirection: "row",
     alignItems: "center",
-
-    backgroundColor: "#F7F5EE",
-
-    borderWidth: 1,
-    borderColor: "transparent",
-    borderRadius: 15,
-
-    paddingHorizontal: 13,
   },
 
-  editableInputContainer: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#D9D5C8",
+  formFieldIcon: {
+    width: 39,
+    height: 39,
+    borderRadius: 13,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: COLORS.primaryLight,
+
+    marginRight: 11,
   },
 
-  errorInputContainer: {
-    borderColor: "#C75C5C",
-  },
-
-  input: {
+  formFieldContent: {
     flex: 1,
-    height: 48,
+  },
 
-    color: "#4A4A3A",
+  formLabel: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  formInput: {
+    minHeight: 31,
+
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: "600",
 
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
+    paddingVertical: 4,
   },
 
-  disabledInput: {
-    color: "#6D6D5D",
+  readOnlyInput: {
+    color: COLORS.text,
+    opacity: 1,
   },
 
   errorText: {
-    color: "#C75C5C",
+    color: COLORS.danger,
     fontSize: 10,
     fontWeight: "600",
 
-    marginTop: 5,
+    marginTop: 4,
+    marginLeft: 50,
   },
 
-  accountCard: {
-    backgroundColor: "#FFFFFF",
+  menuCard: {
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 15,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 22,
-
-    elevation: 2,
+    borderColor: COLORS.border,
+    borderRadius: 21,
   },
 
-  accountInfoRow: {
+  menuItem: {
     minHeight: 68,
 
     flexDirection: "row",
     alignItems: "center",
   },
 
-  accountInfoBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#E8E4D9",
-  },
-
-  accountIcon: {
-    width: 40,
-    height: 40,
+  menuIcon: {
+    width: 39,
+    height: 39,
     borderRadius: 13,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.primaryLight,
 
-    marginRight: 12,
+    marginRight: 11,
   },
 
-  accountInfoText: {
+  menuContent: {
     flex: 1,
   },
 
-  accountTitle: {
-    color: "#4A4A3A",
+  menuTitle: {
+    color: COLORS.text,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 
-  accountValue: {
-    color: "#A1A18E",
-    fontSize: 10,
+  menuDescription: {
+    color: COLORS.textMuted,
+    fontSize: 9,
 
     marginTop: 3,
   },
 
-  securityOption: {
-    minHeight: 76,
+  mainActionButton: {
+    height: 54,
+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: COLORS.primary,
+
+    borderRadius: 17,
+
+    marginTop: 24,
+  },
+
+  mainActionButtonText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: "800",
+
+    marginLeft: 8,
+  },
+
+  cancelEditButton: {
+    height: 48,
+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: COLORS.card,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+
+    marginTop: 10,
+  },
+
+  cancelEditText: {
+    color: COLORS.textSecondary,
+
+    fontSize: 11,
+    fontWeight: "800",
+
+    marginLeft: 6,
+  },
+
+  disabledButton: {
+    opacity: 0.6,
+  },
+
+  dangerSectionTitle: {
+    color: COLORS.danger,
+  },
+
+  dangerCard: {
+    minHeight: 82,
 
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.dangerLight,
 
     paddingHorizontal: 15,
 
     borderWidth: 1,
-    borderColor: "#E8E4D9",
+    borderColor: COLORS.dangerBorder,
+
     borderRadius: 20,
-
-    elevation: 2,
   },
 
-  securityIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    backgroundColor: "#F3F1E9",
-
-    marginRight: 12,
-  },
-
-  securityInfo: {
-    flex: 1,
-  },
-
-  securityTitle: {
-    color: "#4A4A3A",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
-  securityDescription: {
-    color: "#A1A18E",
-    fontSize: 10,
-
-    marginTop: 3,
-  },
-
-  actionContainer: {
-    flexDirection: "row",
-
-    marginTop: 25,
-  },
-
-  cancelButton: {
-    flex: 1,
-    height: 53,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    backgroundColor: "#F3F1E9",
-
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 16,
-
-    marginRight: 8,
-  },
-
-  cancelText: {
-    color: "#6D6D5D",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-
-  saveButton: {
-    flex: 2,
-    height: 53,
-
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-
-    backgroundColor: "#7A8450",
-
-    borderRadius: 16,
-    marginLeft: 8,
-
-    elevation: 3,
-  },
-
-  saveText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "800",
-
-    marginLeft: 7,
-  },
-
-  editButton: {
-    height: 53,
-
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-
-    backgroundColor: "#7A8450",
-
-    borderRadius: 16,
-    marginTop: 25,
-
-    elevation: 3,
-  },
-
-  editText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "800",
-
-    marginLeft: 7,
-  },
-
-  dangerCard: {
-    backgroundColor: "#FFF7F7",
-
-    padding: 16,
-
-    borderWidth: 1,
-    borderColor: "#F1CECE",
-    borderRadius: 22,
-  },
-
-  dangerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  dangerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    backgroundColor: "#FFE8E8",
-
-    marginRight: 12,
-  },
-
-  dangerInfo: {
+  dangerTextContainer: {
     flex: 1,
   },
 
   dangerTitle: {
-    color: "#B44A4A",
-    fontSize: 14,
+    color: COLORS.danger,
+    fontSize: 13,
     fontWeight: "800",
   },
 
   dangerDescription: {
-    color: "#8D6868",
-    fontSize: 10,
-    lineHeight: 16,
+    color: COLORS.dangerText,
+    fontSize: 9,
+    lineHeight: 14,
 
     marginTop: 3,
   },
 
-  deleteAccountButton: {
-    height: 50,
+  deleteButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
 
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#FFFFFF",
-
-    borderWidth: 1,
-    borderColor: "#E8AFAF",
-    borderRadius: 15,
-
-    marginTop: 15,
-  },
-
-  deleteAccountText: {
-    color: "#B44A4A",
-    fontSize: 12,
-    fontWeight: "800",
-
-    marginLeft: 7,
-  },
-
-  disabledButton: {
-    opacity: 0.55,
+    backgroundColor: COLORS.card,
   },
 });

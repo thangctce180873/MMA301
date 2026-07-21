@@ -1,4 +1,6 @@
+import { COLORS } from "../constants/colors";
 import React, { useCallback, useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -10,13 +12,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+
 import BackButton from "../components/BackButton";
+
 import { useAuth } from "../context/AuthContext";
 import { getUserInitials } from "../utils/authUtils";
 import { categories } from "../utils/categories";
+
 import {
   deleteItem,
   formatPrice,
@@ -30,10 +36,14 @@ import {
 
 export default function DetailScreen({ route, navigation }) {
   const { user } = useAuth();
+
   const itemId = route.params?.itemId;
+
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
+
   const [processing, setProcessing] = useState(false);
+
   const loadItem = useCallback(async () => {
     try {
       setLoading(true);
@@ -62,11 +72,33 @@ export default function DetailScreen({ route, navigation }) {
   );
 
   const ownerOfCurrentItem = isItemOwner(item, user);
+
   const currentItemIsFavorite = isItemFavorite(item, user);
+
   const categoryName =
     categories.find((category) => category.id === item?.category)?.name ||
     "Khác";
+
   const sellerInitial = getUserInitials(item?.sellerName);
+
+  const handleOpenMessages = () => {
+    if (!item) {
+      return;
+    }
+
+    if (ownerOfCurrentItem) {
+      navigation.navigate("MainTabs", {
+        screen: "MessagesTab",
+      });
+
+      return;
+    }
+
+    navigation.navigate("Messages", {
+      itemId: item.id,
+    });
+  };
+
   const handleToggleFavorite = async () => {
     if (!item || processing) {
       return;
@@ -77,15 +109,18 @@ export default function DetailScreen({ route, navigation }) {
 
       const result = await toggleFavorite(item.id, user);
 
-      if (!result.success) {
-        Alert.alert("Không thể cập nhật", result.message);
+      if (!result?.success) {
+        Alert.alert(
+          "Không thể cập nhật",
+          result?.message || "Không thể cập nhật sản phẩm đã lưu.",
+        );
 
         return;
       }
 
       await loadItem();
     } catch (error) {
-      console.error("Lỗi khi cập nhật sản phẩm đã lưu:", error);
+      console.error("Lỗi cập nhật sản phẩm đã lưu:", error);
 
       Alert.alert("Có lỗi xảy ra", "Không thể cập nhật sản phẩm đã lưu.");
     } finally {
@@ -103,15 +138,18 @@ export default function DetailScreen({ route, navigation }) {
 
       const result = await toggleSoldStatus(item.id, user);
 
-      if (!result.success) {
-        Alert.alert("Không thể cập nhật", result.message);
+      if (!result?.success) {
+        Alert.alert(
+          "Không thể cập nhật",
+          result?.message || "Không thể cập nhật trạng thái sản phẩm.",
+        );
 
         return;
       }
 
       await loadItem();
     } catch (error) {
-      console.error("Lỗi khi cập nhật trạng thái:", error);
+      console.error("Lỗi cập nhật trạng thái:", error);
 
       Alert.alert("Có lỗi xảy ra", "Không thể cập nhật trạng thái sản phẩm.");
     } finally {
@@ -120,12 +158,12 @@ export default function DetailScreen({ route, navigation }) {
   };
 
   const handleDelete = () => {
-    if (!item || !ownerOfCurrentItem) {
+    if (!item || !ownerOfCurrentItem || processing) {
       return;
     }
 
     Alert.alert(
-      "Xóa sản phẩm",
+      "Xóa tin đăng",
       "Bạn có chắc chắn muốn xóa tin đăng này không?",
       [
         {
@@ -142,16 +180,19 @@ export default function DetailScreen({ route, navigation }) {
 
               const result = await deleteItem(item.id, user);
 
-              if (result.success) {
+              if (result?.success) {
                 navigation.goBack();
                 return;
               }
 
-              Alert.alert("Xóa thất bại", result.message);
+              Alert.alert(
+                "Xóa thất bại",
+                result?.message || "Không thể xóa tin đăng.",
+              );
             } catch (error) {
-              console.error("Lỗi khi xóa sản phẩm:", error);
+              console.error("Lỗi khi xóa tin đăng:", error);
 
-              Alert.alert("Xóa thất bại", "Không thể xóa sản phẩm.");
+              Alert.alert("Có lỗi xảy ra", "Không thể xóa tin đăng.");
             } finally {
               setProcessing(false);
             }
@@ -180,7 +221,7 @@ export default function DetailScreen({ route, navigation }) {
 
       if (!supported) {
         Alert.alert(
-          "Không thể mở ứng dụng gọi điện",
+          "Không thể gọi điện",
           `Số điện thoại người bán: ${phoneNumber}`,
         );
 
@@ -189,7 +230,7 @@ export default function DetailScreen({ route, navigation }) {
 
       await Linking.openURL(phoneUrl);
     } catch (error) {
-      console.error("Lỗi khi mở ứng dụng gọi điện:", error);
+      console.error("Lỗi khi gọi điện:", error);
 
       Alert.alert(
         "Không thể gọi điện",
@@ -201,7 +242,7 @@ export default function DetailScreen({ route, navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.centerContainer} edges={["top", "bottom"]}>
-        <ActivityIndicator size="large" color="#7A8450" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
 
         <Text style={styles.loadingText}>Đang tải sản phẩm...</Text>
       </SafeAreaView>
@@ -211,22 +252,24 @@ export default function DetailScreen({ route, navigation }) {
   if (!item) {
     return (
       <SafeAreaView style={styles.centerContainer} edges={["top", "bottom"]}>
-        <Ionicons name="alert-circle-outline" size={55} color="#A1A18E" />
+        <View style={styles.emptyIcon}>
+          <Ionicons name="cube-outline" size={45} color={COLORS.textMuted} />
+        </View>
 
-        <Text style={styles.notFoundTitle}>Không tìm thấy sản phẩm</Text>
+        <Text style={styles.emptyTitle}>Không tìm thấy sản phẩm</Text>
 
-        <Text style={styles.notFoundDescription}>
+        <Text style={styles.emptyDescription}>
           Sản phẩm có thể đã bị xóa hoặc không còn tồn tại.
         </Text>
 
         <TouchableOpacity
           activeOpacity={0.85}
-          style={styles.backHomeButton}
+          style={styles.backActionButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={18} color={COLORS.white} />
 
-          <Text style={styles.backHomeText}>QUAY LẠI</Text>
+          <Text style={styles.backActionText}>QUAY LẠI</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -237,21 +280,25 @@ export default function DetailScreen({ route, navigation }) {
       <View style={styles.header}>
         <BackButton disabled={processing} onPress={() => navigation.goBack()} />
 
-        <Text style={styles.headerTitle}>Chi tiết sản phẩm</Text>
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.headerTitle}>Chi tiết sản phẩm</Text>
+
+          <Text style={styles.headerSubtitle}>Thông tin tin đăng</Text>
+        </View>
 
         <TouchableOpacity
           activeOpacity={0.75}
-          style={styles.favoriteButton}
           disabled={processing}
+          style={styles.saveButton}
           onPress={handleToggleFavorite}
         >
           {processing ? (
-            <ActivityIndicator size="small" color="#7A8450" />
+            <ActivityIndicator size="small" color={COLORS.primary} />
           ) : (
             <Ionicons
-              name={currentItemIsFavorite ? "heart" : "heart-outline"}
-              size={24}
-              color={currentItemIsFavorite ? "#D97706" : "#4A4A3A"}
+              name={currentItemIsFavorite ? "bookmark" : "bookmark-outline"}
+              size={23}
+              color={COLORS.primary}
             />
           )}
         </TouchableOpacity>
@@ -272,7 +319,11 @@ export default function DetailScreen({ route, navigation }) {
             />
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Ionicons name="image-outline" size={60} color="#A1A18E" />
+              <Ionicons
+                name="image-outline"
+                size={60}
+                color={COLORS.textMuted}
+              />
             </View>
           )}
 
@@ -298,7 +349,7 @@ export default function DetailScreen({ route, navigation }) {
                 <Ionicons
                   name="person-circle-outline"
                   size={14}
-                  color="#7A8450"
+                  color={COLORS.primary}
                 />
 
                 <Text style={styles.ownerBadgeText}>TIN CỦA BẠN</Text>
@@ -310,36 +361,20 @@ export default function DetailScreen({ route, navigation }) {
 
           <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
 
-          <View style={styles.basicInfoCard}>
-            <View style={styles.infoRow}>
-              <View style={styles.infoIcon}>
-                <Ionicons name="location-outline" size={19} color="#7A8450" />
-              </View>
-
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Địa điểm giao dịch</Text>
-
-                <Text style={styles.infoText}>
-                  {item.location || "Chưa cập nhật"}
-                </Text>
-              </View>
-            </View>
+          <View style={styles.infoCard}>
+            <InfoRow
+              icon="location-outline"
+              label="Địa điểm giao dịch"
+              value={item.location || "Chưa cập nhật"}
+            />
 
             <View style={styles.infoDivider} />
 
-            <View style={styles.infoRow}>
-              <View style={styles.infoIcon}>
-                <Ionicons name="time-outline" size={19} color="#7A8450" />
-              </View>
-
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Thời gian đăng</Text>
-
-                <Text style={styles.infoText}>
-                  {formatTimeAgo(item.createdAt)}
-                </Text>
-              </View>
-            </View>
+            <InfoRow
+              icon="time-outline"
+              label="Thời gian đăng"
+              value={formatTimeAgo(item.createdAt)}
+            />
           </View>
 
           <View style={styles.sellerCard}>
@@ -365,7 +400,11 @@ export default function DetailScreen({ route, navigation }) {
               </Text>
 
               <View style={styles.phoneRow}>
-                <Ionicons name="call-outline" size={14} color="#7A8450" />
+                <Ionicons
+                  name="call-outline"
+                  size={14}
+                  color={COLORS.primary}
+                />
 
                 <Text style={styles.sellerPhone}>
                   {item.sellerPhone || "Chưa có số điện thoại"}
@@ -374,27 +413,54 @@ export default function DetailScreen({ route, navigation }) {
             </View>
 
             <View style={styles.verifiedIcon}>
-              <Ionicons name="checkmark-circle" size={22} color="#7A8450" />
+              <Ionicons
+                name="checkmark-circle"
+                size={23}
+                color={COLORS.success}
+              />
             </View>
           </View>
 
-          <View style={styles.descriptionSection}>
+          <View style={styles.descriptionCard}>
             <Text style={styles.descriptionTitle}>Mô tả chi tiết</Text>
 
             <Text style={styles.descriptionText}>
-              {item.description || "Chưa có mô tả."}
+              {item.description ||
+                "Người bán chưa thêm mô tả cho sản phẩm này."}
             </Text>
           </View>
 
           <TouchableOpacity
             activeOpacity={0.85}
-            style={styles.contactButton}
-            onPress={handleContactSeller}
+            disabled={processing}
+            style={[styles.messageButton, processing && styles.disabledButton]}
+            onPress={handleOpenMessages}
           >
-            <Ionicons name="call-outline" size={20} color="#FFFFFF" />
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={20}
+              color={COLORS.white}
+            />
 
-            <Text style={styles.contactText}>GỌI CHO NGƯỜI BÁN</Text>
+            <Text style={styles.messageButtonText}>
+              {ownerOfCurrentItem
+                ? "XEM TIN NHẮN NGƯỜI MUA"
+                : "NHẮN TIN VỚI NGƯỜI BÁN"}
+            </Text>
           </TouchableOpacity>
+
+          {!ownerOfCurrentItem ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={processing}
+              style={[styles.callButton, processing && styles.disabledButton]}
+              onPress={handleContactSeller}
+            >
+              <Ionicons name="call-outline" size={20} color={COLORS.white} />
+
+              <Text style={styles.callButtonText}>GỌI CHO NGƯỜI BÁN</Text>
+            </TouchableOpacity>
+          ) : null}
 
           {ownerOfCurrentItem ? (
             <>
@@ -410,27 +476,21 @@ export default function DetailScreen({ route, navigation }) {
                 ]}
                 onPress={handleToggleSold}
               >
-                {processing ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name={
-                        item.status === "sold"
-                          ? "refresh-outline"
-                          : "checkmark-circle-outline"
-                      }
-                      size={20}
-                      color="#FFFFFF"
-                    />
+                <Ionicons
+                  name={
+                    item.status === "sold"
+                      ? "refresh-outline"
+                      : "checkmark-circle-outline"
+                  }
+                  size={20}
+                  color={item.status === "sold" ? COLORS.white : COLORS.success}
+                />
 
-                    <Text style={styles.soldButtonText}>
-                      {item.status === "sold"
-                        ? "ĐÁNH DẤU ĐANG BÁN"
-                        : "ĐÁNH DẤU ĐÃ BÁN"}
-                    </Text>
-                  </>
-                )}
+                <Text style={styles.soldButtonText}>
+                  {item.status === "sold"
+                    ? "ĐÁNH DẤU ĐANG BÁN"
+                    : "ĐÁNH DẤU ĐÃ BÁN"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -443,9 +503,13 @@ export default function DetailScreen({ route, navigation }) {
                 ]}
                 onPress={handleDelete}
               >
-                <Ionicons name="trash-outline" size={20} color="#B44A4A" />
+                <Ionicons
+                  name="trash-outline"
+                  size={20}
+                  color={COLORS.danger}
+                />
 
-                <Text style={styles.deleteText}>XÓA TIN ĐĂNG</Text>
+                <Text style={styles.deleteButtonText}>XÓA TIN ĐĂNG</Text>
               </TouchableOpacity>
             </>
           ) : null}
@@ -455,10 +519,26 @@ export default function DetailScreen({ route, navigation }) {
   );
 }
 
+function InfoRow({ icon, label, value }) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoIcon}>
+        <Ionicons name={icon} size={20} color={COLORS.primary} />
+      </View>
+
+      <View style={styles.infoContent}>
+        <Text style={styles.infoLabel}>{label}</Text>
+
+        <Text style={styles.infoValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FDFCF8",
+    backgroundColor: COLORS.background,
   },
 
   centerContainer: {
@@ -467,69 +547,105 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#FDFCF8",
+    backgroundColor: COLORS.background,
 
     paddingHorizontal: 30,
   },
 
   loadingText: {
-    color: "#8A8A75",
+    color: COLORS.textSecondary,
     fontSize: 13,
+
     marginTop: 12,
   },
 
-  notFoundTitle: {
-    color: "#4A4A3A",
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 14,
+  emptyIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: 25,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: COLORS.primaryLight,
   },
 
-  notFoundDescription: {
-    color: "#A1A18E",
-    fontSize: 13,
-    lineHeight: 20,
+  emptyTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: "800",
+
+    marginTop: 16,
+  },
+
+  emptyDescription: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    lineHeight: 19,
+
     textAlign: "center",
+
     marginTop: 6,
   },
 
-  backHomeButton: {
+  backActionButton: {
+    height: 48,
+
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
 
-    backgroundColor: "#7A8450",
+    backgroundColor: COLORS.primary,
 
     paddingHorizontal: 22,
-    paddingVertical: 12,
 
-    borderRadius: 14,
+    borderRadius: 16,
+
     marginTop: 20,
   },
 
-  backHomeText: {
-    color: "#FFFFFF",
+  backActionText: {
+    color: COLORS.white,
     fontSize: 12,
     fontWeight: "800",
+
     marginLeft: 7,
   },
 
   header: {
-    minHeight: 66,
+    minHeight: 68,
 
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 14,
     paddingVertical: 10,
 
     borderBottomWidth: 1,
-    borderBottomColor: "#E8E4D9",
+    borderBottomColor: COLORS.border,
   },
 
-  favoriteButton: {
+  headerTextContainer: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  headerTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: "800",
+  },
+
+  headerSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+
+    marginTop: 2,
+  },
+
+  saveButton: {
     width: 42,
     height: 42,
     borderRadius: 14,
@@ -537,13 +653,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
-  },
-
-  headerTitle: {
-    color: "#4A4A3A",
-    fontSize: 16,
-    fontWeight: "800",
+    backgroundColor: COLORS.primaryLight,
   },
 
   scrollContent: {
@@ -556,7 +666,7 @@ const styles = StyleSheet.create({
 
     position: "relative",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.imagePlaceholder,
   },
 
   productImage: {
@@ -585,8 +695,8 @@ const styles = StyleSheet.create({
   },
 
   conditionText: {
-    color: "#7A8450",
-    fontSize: 11,
+    color: COLORS.primary,
+    fontSize: 10,
     fontWeight: "800",
   },
 
@@ -595,7 +705,7 @@ const styles = StyleSheet.create({
     left: 15,
     bottom: 15,
 
-    backgroundColor: "#8B5E3C",
+    backgroundColor: COLORS.primaryDark,
 
     paddingHorizontal: 13,
     paddingVertical: 7,
@@ -604,8 +714,8 @@ const styles = StyleSheet.create({
   },
 
   soldText: {
-    color: "#FFFFFF",
-    fontSize: 11,
+    color: COLORS.white,
+    fontSize: 10,
     fontWeight: "800",
   },
 
@@ -621,10 +731,9 @@ const styles = StyleSheet.create({
   },
 
   categoryText: {
-    color: "#A1A18E",
-    fontSize: 10,
+    color: COLORS.primary,
+    fontSize: 9,
     fontWeight: "800",
-
     letterSpacing: 0.7,
     textTransform: "uppercase",
   },
@@ -633,7 +742,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.primaryLight,
 
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -642,55 +751,57 @@ const styles = StyleSheet.create({
   },
 
   ownerBadgeText: {
-    color: "#7A8450",
+    color: COLORS.primary,
     fontSize: 8,
     fontWeight: "800",
+
     marginLeft: 4,
   },
 
   productTitle: {
-    color: "#4A4A3A",
+    color: COLORS.text,
     fontSize: 23,
     lineHeight: 30,
     fontWeight: "800",
+
     marginTop: 7,
   },
 
   priceText: {
-    color: "#7A8450",
+    color: COLORS.primary,
     fontSize: 22,
     fontWeight: "800",
+
     marginTop: 10,
     marginBottom: 17,
   },
 
-  basicInfoCard: {
-    backgroundColor: "#FFFFFF",
-
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 19,
+  infoCard: {
+    backgroundColor: COLORS.card,
 
     paddingHorizontal: 14,
-    paddingVertical: 4,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
   },
 
   infoRow: {
-    minHeight: 64,
+    minHeight: 66,
 
     flexDirection: "row",
     alignItems: "center",
   },
 
   infoIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: COLORS.primaryLight,
 
     marginRight: 11,
   },
@@ -700,53 +811,55 @@ const styles = StyleSheet.create({
   },
 
   infoLabel: {
-    color: "#A1A18E",
-    fontSize: 10,
-    fontWeight: "600",
+    color: COLORS.textMuted,
+    fontSize: 9,
+    fontWeight: "700",
   },
 
-  infoText: {
-    color: "#5D5D4D",
+  infoValue: {
+    color: COLORS.textSecondary,
     fontSize: 13,
     fontWeight: "700",
-    marginTop: 2,
+
+    marginTop: 3,
   },
 
   infoDivider: {
     height: 1,
-    backgroundColor: "#F3F1E9",
-    marginLeft: 49,
+
+    backgroundColor: COLORS.border,
+
+    marginLeft: 51,
   },
 
   sellerCard: {
-    minHeight: 84,
+    minHeight: 86,
 
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.primarySoft,
 
     paddingHorizontal: 15,
     paddingVertical: 12,
 
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 19,
+    borderRadius: 20,
 
     marginTop: 15,
   },
 
   sellerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#D6CEB8",
+    backgroundColor: COLORS.primaryLight,
 
     overflow: "hidden",
+
     marginRight: 12,
   },
 
@@ -756,7 +869,7 @@ const styles = StyleSheet.create({
   },
 
   sellerAvatarText: {
-    color: "#8A8A75",
+    color: COLORS.primaryDark,
     fontSize: 14,
     fontWeight: "800",
   },
@@ -766,85 +879,111 @@ const styles = StyleSheet.create({
   },
 
   sellerLabel: {
-    color: "#A1A18E",
-    fontSize: 10,
-    fontWeight: "600",
+    color: COLORS.textMuted,
+    fontSize: 9,
   },
 
   sellerName: {
-    color: "#4A4A3A",
+    color: COLORS.text,
     fontSize: 15,
     fontWeight: "800",
+
     marginTop: 2,
   },
 
   phoneRow: {
     flexDirection: "row",
     alignItems: "center",
+
     marginTop: 5,
   },
 
   sellerPhone: {
-    color: "#7A8450",
-    fontSize: 12,
+    color: COLORS.primary,
+    fontSize: 11,
     fontWeight: "700",
+
     marginLeft: 5,
   },
 
   verifiedIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#F3F1E9",
+    backgroundColor: "transparent",
   },
 
-  descriptionSection: {
-    backgroundColor: "#FFFFFF",
-
-    borderWidth: 1,
-    borderColor: "#E8E4D9",
-    borderRadius: 19,
+  descriptionCard: {
+    backgroundColor: COLORS.card,
 
     padding: 16,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+
     marginTop: 15,
   },
 
   descriptionTitle: {
-    color: "#4A4A3A",
-    fontSize: 17,
+    color: COLORS.text,
+    fontSize: 16,
     fontWeight: "800",
   },
 
   descriptionText: {
-    color: "#6D6D5D",
-    fontSize: 14,
-    lineHeight: 22,
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    lineHeight: 21,
+
     marginTop: 9,
   },
 
-  contactButton: {
+  messageButton: {
     height: 53,
 
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#7A8450",
+    backgroundColor: COLORS.primary,
 
-    borderRadius: 16,
+    borderRadius: 17,
+
     marginTop: 24,
-
-    elevation: 3,
   },
 
-  contactText: {
-    color: "#FFFFFF",
-    fontSize: 13,
+  messageButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
     fontWeight: "800",
+
+    marginLeft: 8,
+  },
+
+  callButton: {
+    height: 53,
+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: COLORS.call,
+
+    borderRadius: 17,
+
+    marginTop: 12,
+  },
+
+  callButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "800",
+
     marginLeft: 8,
   },
 
@@ -855,25 +994,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#8B5E3C",
+    backgroundColor: COLORS.primaryDark,
 
-    borderRadius: 16,
+    borderRadius: 17,
+
     marginTop: 12,
   },
 
   sellingButton: {
-    backgroundColor: "#7A8450",
+    backgroundColor: COLORS.primary,
   },
 
   soldButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
+    color: COLORS.white,
+    fontSize: 12,
     fontWeight: "800",
-    marginLeft: 8,
-  },
 
-  disabledButton: {
-    opacity: 0.65,
+    marginLeft: 8,
   },
 
   deleteButton: {
@@ -883,19 +1020,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: "#FFF4F4",
+    backgroundColor: COLORS.dangerLight,
 
     borderWidth: 1,
-    borderColor: "#F1CECE",
-    borderRadius: 16,
+    borderColor: COLORS.dangerBorder,
+    borderRadius: 17,
 
     marginTop: 12,
   },
 
-  deleteText: {
-    color: "#B44A4A",
-    fontSize: 13,
+  deleteButtonText: {
+    color: COLORS.danger,
+    fontSize: 12,
     fontWeight: "800",
+
     marginLeft: 8,
+  },
+
+  disabledButton: {
+    opacity: 0.6,
   },
 });
