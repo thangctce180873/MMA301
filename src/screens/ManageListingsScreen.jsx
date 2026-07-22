@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 
 import BackButton from "../components/BackButton";
-
+                                                                                        
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../utils/categories";
 

@@ -11,6 +11,7 @@ import MainTabs from "./MainTabs";
 
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
+import OnboardingScreen from "../screens/OnboardingScreen";
 import DetailScreen from "../screens/DetailScreen";
 import MessagesScreen from "../screens/MessagesScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
@@ -87,6 +88,8 @@ export default function RootStack() {
         </>
       ) : (
         <>
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          
           <Stack.Screen name="Login" component={LoginScreen} />
 
           <Stack.Screen name="Register" component={RegisterScreen} />
